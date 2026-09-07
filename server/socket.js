@@ -20,6 +20,9 @@ function initSocket(server) {
     if (!token) return next(new Error('No token provided'));
     try {
       socket.user = jwt.verify(token, process.env.JWT_SECRET);
+      if (socket.user.type === 'refresh') {
+        return next(new Error('Refresh tokens cannot be used for realtime connection'));
+      }
       next();
     } catch {
       next(new Error('Invalid or expired token'));

@@ -1,25 +1,22 @@
 import { createContext, useContext, useEffect, useState } from 'react';
 import api from '../api/client';
+import { getAccessToken, getUser, setSession, clearSession } from '../api/authStorage';
 
 const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
-  const [user, setUser] = useState(() => {
-    const stored = localStorage.getItem('user');
-    return stored ? JSON.parse(stored) : null;
-  });
+  const [user, setUser] = useState(() => getUser());
   const [loading, setLoading] = useState(true);
 
   const fetchProfile = async (u) => {
     try {
       const { data } = await api.get('/auth/me');
       const enriched = { ...(u || data), ...data };
-      localStorage.setItem('user', JSON.stringify(enriched));
+      setSession({ accessToken: null, refreshToken: null, user: enriched });
       return enriched;
     } catch (err) {
       if (err.response?.status === 401) {
-        localStorage.removeItem('token');
-        localStorage.removeItem('user');
+        clearSession();
         return null;
       }
       return u;
@@ -29,10 +26,8 @@ export function AuthProvider({ children }) {
   // On mount: refresh profile so retailer/supplier IDs are always current
   useEffect(() => {
     (async () => {
-      if (localStorage.getItem('token')) {
-        const stored = localStorage.getItem('user');
-        const base = stored ? JSON.parse(stored) : null;
-        const fresh = await fetchProfile(base);
+      if (getAccessToken()) {
+        const fresh = await fetchProfile(getUser());
         setUser(fresh);
       }
       setLoading(false);
@@ -42,7 +37,7 @@ export function AuthProvider({ children }) {
 
   const login = async (email, password) => {
     const { data } = await api.post('/auth/login', { email, password });
-    localStorage.setItem('token', data.token);
+    setSession({ accessToken: data.accessToken, refreshToken: data.refreshToken, user: data.user });
     const profile = await fetchProfile(data.user);
     setUser(profile);
     return profile;
@@ -50,15 +45,20 @@ export function AuthProvider({ children }) {
 
   const register = async (payload) => {
     const { data } = await api.post('/auth/register', payload);
-    localStorage.setItem('token', data.token);
+    setSession({ accessToken: data.accessToken, refreshToken: data.refreshToken, user: data.user });
     const profile = await fetchProfile(data.user);
     setUser(profile);
     return profile;
   };
 
-  const logout = () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
+  const logout = async () => {
+    try {
+      const { getRefreshToken } = await import('../api/authStorage');
+      await api.post('/auth/logout', { refreshToken: getRefreshToken() });
+    } catch {
+      // Server-side revoke is best-effort; local state is always cleared.
+    }
+    clearSession();
     setUser(null);
   };
 

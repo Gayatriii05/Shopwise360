@@ -4,11 +4,27 @@
 const axios = require('axios');
 const fs = require('fs');
 const path = require('path');
+const { execFileSync } = require('child_process');
 
 const API = 'http://localhost:5000/api';
 const PASSWORD = 'Password123';
 const results = [];
 const facts = [];
+
+// ---- mysql helper (reads credentials from server/.env, never logs the password) ----
+function envValue(key) {
+  const line = fs.readFileSync(path.resolve(__dirname, '../server/.env'), 'utf8')
+    .split(/\r?\n/).map((l) => l.trim()).find((l) => l.startsWith(`${key}=`));
+  return line ? line.slice(key.length + 1) : '';
+}
+function db(sql) {
+  const env = {
+    ...process.env,
+    MYSQL_PWD: envValue('DB_PASSWORD')
+  };
+  const args = ['-u', envValue('DB_USER') || 'root', '-h', envValue('DB_HOST') || 'localhost', envValue('DB_NAME') || 'shopwise360', '-N', '-B', '-e', sql];
+  return execFileSync(path.join('C:', 'Program Files', 'MySQL', 'MySQL Server 8.0', 'bin', 'mysql.exe'), args, { env, encoding: 'utf8' }).trim();
+}
 
 function record(name, ok, detail = '') {
   results.push({ name, ok });
@@ -170,13 +186,13 @@ async function main() {
   record('#orders sale + profit recorded (dashboard grew)', Number(totalsAfter.total_orders) === Number(preTotals.total_orders) + 1 && Number(totalsAfter.total_revenue) >= Number(preTotals.total_revenue));
   facts.push({ name: 'audit:orders:sales_recorded', detail: `revenue +${Number(totalsAfter.total_revenue) - Number(preTotals.total_revenue)}` });
 
-  // oversell → guarded, rolls back
+  // oversell → guarded, rolls back, and reports a proper 409 (not a 500)
   const ob = (await api('get', `/inventory/retailer/${retailerId}`, { token: roles.retailer.token })).data.find((i) => i.quantity < 10);
   const beforeOrdersCount = (await api('get', `/orders/customer/${custId}`, { token: roles.customer.token })).data.length;
   const badResp = await api('post', '/orders', { token: roles.customer.token, data: { retailer_id: retailerId, items: [{ product_id: ob.product_id, quantity: 99999 }] } });
   const obInv = (await api('get', `/inventory/retailer/${retailerId}`, { token: roles.retailer.token })).data.find((i) => i.id === ob.id);
   const afterOrdersCount = (await api('get', `/orders/customer/${custId}`, { token: roles.customer.token })).data.length;
-  record('#orders oversell blocked + rollback', badResp.status === 500 && /Insufficient stock/.test(badResp.data.error) && afterOrdersCount === beforeOrdersCount && obInv.quantity === ob.quantity, `status=${badResp.status}`);
+  record('#orders oversell blocked + rollback', badResp.status === 409 && /Insufficient stock/.test(badResp.data.error) && afterOrdersCount === beforeOrdersCount && obInv.quantity === ob.quantity, `status=${badResp.status}`);
 
   // multi-item order verification (pick two items with real stock)
   const two = stockable.filter((i) => i.quantity > 2).slice(0, 2);
@@ -225,6 +241,10 @@ async function main() {
   record('#wishlist remove', delW.status === 200 && w.data.length === beforeW);
 
   // ---------- REVIEWS ----------
+  // make the review pool deterministic across repeated runs: the seed customer's
+  // previous audit reviews would otherwise exhaust every purchasable product,
+  // turning "purchased customer can review" into a state-dependent flake.
+  db(`DELETE FROM reviews WHERE customer_id=${custId}`);
   // negative: fresh customer (no purchase) blocked
   const fresh = await api('post', '/auth/register', { data: { name: 'Fresh Buyer', email: `fresh_${Date.now()}@test.com`, password: 'secret123', role: 'customer' } });
   const negRev = await api('post', `/products/${allProducts[0].id}/reviews`, { token: fresh.data.token, data: { rating: 5, comment: 'nope' } });

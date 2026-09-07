@@ -169,6 +169,20 @@ CREATE TABLE wishlists (
   UNIQUE KEY uniq_wishlist_item (customer_id, product_id)
 );
 
+CREATE TABLE refresh_tokens (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  user_id INT NOT NULL,
+  token_hash CHAR(64) NOT NULL,
+  expires_at DATETIME NOT NULL,
+  revoked TINYINT(1) NOT NULL DEFAULT 0,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY uniq_refresh_token_hash (token_hash),
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+CREATE INDEX idx_refresh_tokens_user ON refresh_tokens(user_id);
+CREATE INDEX idx_refresh_tokens_expiry ON refresh_tokens(expires_at);
+
 CREATE INDEX idx_inventory_retailer ON inventory(retailer_id);
 CREATE INDEX idx_sales_product ON sales_transactions(product_id);
 CREATE INDEX idx_sales_retailer_date ON sales_transactions(retailer_id, sold_at);

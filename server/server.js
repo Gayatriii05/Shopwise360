@@ -36,10 +36,22 @@ app.use('/api/retailers', retailerRoutes);
 app.use('/api/coupons', couponRoutes);
 app.use('/api/reports', reportRoutes);
 
-// Global error handler
+// Global error handler — always responds with the consistent { error } shape.
+// Route handlers that already respond in their own try/catch never reach here;
+// this catches malformed JSON, multer upload failures and any unhandled throw.
 app.use((err, req, res, next) => {
-  console.error(err.stack);
-  res.status(500).json({ error: 'Something went wrong' });
+  if (err.type === 'entity.parse.failed') {
+    return res.status(400).json({ error: 'Malformed JSON in request body' });
+  }
+  if (err.name === 'MulterError') {
+    const status = err.code === 'LIMIT_FILE_SIZE' ? 413 : 400;
+    return res.status(status).json({ error: err.message });
+  }
+  const status = err.statusCode || 500;
+  if (status >= 500) console.error(err.stack);
+  res.status(status).json({
+    error: status >= 500 ? 'Something went wrong' : (err.message || 'Request failed')
+  });
 });
 
 // Background job: scan all inventory every hour, create alerts for anything under threshold

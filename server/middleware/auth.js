@@ -8,6 +8,9 @@ function authenticate(req, res, next) {
   const token = header.split(' ')[1];
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    if (decoded.type === 'refresh') {
+      return res.status(401).json({ error: 'Refresh tokens cannot be used for API access' });
+    }
     req.user = decoded; // { id, role, email }
     next();
   } catch (err) {

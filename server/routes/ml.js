@@ -1,15 +1,23 @@
 const express = require('express');
 const axios = require('axios');
+const { body, param } = require('express-validator');
 const pool = require('../config/db');
 const { authenticate, authorize } = require('../middleware/auth');
+const { handleValidation } = require('../utils/validate');
 
 const router = express.Router();
 const ML_URL = process.env.ML_SERVICE_URL || 'http://localhost:6000';
 
+const idParam = (name, message = 'Invalid id') => param(name).isInt({ min: 1 }).withMessage(message);
+
 // Get product recommendations for a customer (calls Python ML microservice).
 // Audit rows are written ONLY when the underlying model was actually (re)computed
 // (X-ML-Computed: true), not on every read/cache hit — keeps the log lean.
-router.get('/recommend/:customerId', authenticate, async (req, res) => {
+router.get('/recommend/:customerId',
+  authenticate,
+  idParam('customerId', 'Invalid customer id'),
+  handleValidation,
+  async (req, res) => {
   try {
     const response = await axios.get(`${ML_URL}/recommend`, {
       params: { customer_id: req.params.customerId }
@@ -38,7 +46,11 @@ router.get('/recommend/:customerId', authenticate, async (req, res) => {
 // demand_predictions rows are upserted (unique per retailer+product+day) and written
 // ONLY when the model was actually (re)computed — cache hits write nothing, so the
 // table is bounded at one row per product per day instead of growing per dashboard load.
-router.get('/predict-demand/:retailerId', authenticate, async (req, res) => {
+router.get('/predict-demand/:retailerId',
+  authenticate,
+  idParam('retailerId', 'Invalid retailer id'),
+  handleValidation,
+  async (req, res) => {
   try {
     const response = await axios.get(`${ML_URL}/predict-demand`, {
       params: { retailer_id: req.params.retailerId }
@@ -77,8 +89,13 @@ router.get('/model-health', authenticate, authorize('admin'), async (req, res) =
 });
 
 // Admin: force (re)build of persisted models
-router.post('/retrain', authenticate, authorize('admin'), async (req, res) => {
-  const { target, retailer_id } = req.body || {};
+router.post('/retrain',
+  authenticate, authorize('admin'),
+  body('target').optional().isIn(['recommend', 'demand', 'all']).withMessage('target must be recommend, demand or all'),
+  body('retailer_id').optional().isInt({ min: 1 }).withMessage('retailer_id must be a positive integer'),
+  handleValidation,
+  async (req, res) => {
+    const { target, retailer_id } = req.body || {};
   try {
     const response = await axios.post(`${ML_URL}/retrain`, { target, retailer_id });
     res.json(response.data);

@@ -1,6 +1,8 @@
 const express = require('express');
+const { body, param } = require('express-validator');
 const pool = require('../config/db');
 const { authenticate, authorize } = require('../middleware/auth');
+const { handleValidation } = require('../utils/validate');
 
 const router = express.Router();
 
@@ -23,10 +25,13 @@ router.get('/mine', authenticate, authorize('customer'), async (req, res) => {
 });
 
 // Customer: add product to wishlist
-router.post('/', authenticate, authorize('customer'), async (req, res) => {
-  const { product_id } = req.body;
-  try {
-    if (!product_id) return res.status(400).json({ error: 'product_id is required' });
+router.post('/',
+  authenticate, authorize('customer'),
+  body('product_id').isInt({ min: 1 }).withMessage('product_id is required'),
+  handleValidation,
+  async (req, res) => {
+    const { product_id } = req.body;
+    try {
     const [existing] = await pool.query(
       'SELECT id FROM wishlists WHERE customer_id = ? AND product_id = ?',
       [req.user.id, product_id]
@@ -43,7 +48,11 @@ router.post('/', authenticate, authorize('customer'), async (req, res) => {
 });
 
 // Customer: remove from wishlist
-router.delete('/:productId', authenticate, authorize('customer'), async (req, res) => {
+router.delete('/:productId',
+  authenticate, authorize('customer'),
+  param('productId').isInt({ min: 1 }).withMessage('Invalid product id'),
+  handleValidation,
+  async (req, res) => {
   try {
     await pool.query(
       'DELETE FROM wishlists WHERE customer_id = ? AND product_id = ?',

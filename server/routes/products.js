@@ -2,8 +2,11 @@ const express = require('express');
 const path = require('path');
 const fs = require('fs');
 const multer = require('multer');
+const { body, param, query } = require('express-validator');
 const pool = require('../config/db');
 const { authenticate, authorize } = require('../middleware/auth');
+const { handleValidation } = require('../utils/validate');
+const { invalidateAllRetailers } = require('../services/dashboardCache');
 
 const router = express.Router();
 
@@ -29,7 +32,19 @@ const upload = multer({
 });
 
 // Public: list products with search/filter/sort/pagination + category + supplier joined
-router.get('/', async (req, res) => {
+const listValidators = [
+  query('search').optional().trim(),
+  query('category_id').optional().isInt({ min: 1 }).withMessage('category_id must be a positive integer'),
+  query('supplier_id').optional().isInt({ min: 1 }).withMessage('supplier_id must be a positive integer'),
+  query('min_price').optional().toFloat().isFloat({ min: 0 }).withMessage('min_price must be >= 0'),
+  query('max_price').optional().toFloat().isFloat({ min: 0 }).withMessage('max_price must be >= 0'),
+  query('sort').optional().isIn(['newest', 'price_asc', 'price_desc', 'name_asc', 'rating']).withMessage('Invalid sort'),
+  query('page').optional().isInt({ min: 1 }).withMessage('page must be a positive integer'),
+  query('limit').optional().isInt({ min: 1, max: 100 }).withMessage('limit must be between 1 and 100'),
+  query('id').optional().isInt({ min: 1 }).withMessage('id must be a positive integer'),
+  handleValidation
+];
+router.get('/', listValidators, async (req, res) => {
   try {
     const {
       search = '',
@@ -133,7 +148,10 @@ router.get('/categories', async (_req, res) => {
   }
 });
 
-router.get('/:id', async (req, res) => {
+router.get('/:id',
+  param('id').isInt({ min: 1 }).withMessage('Invalid product id'),
+  handleValidation,
+  async (req, res) => {
   try {
     const [rows] = await pool.query(`
       SELECT p.*, c.name AS category, s.company_name AS supplier
@@ -164,7 +182,16 @@ router.get('/:id', async (req, res) => {
 });
 
 // Supplier/Admin only: create product (optional image upload via multipart form)
-router.post('/', authenticate, authorize('supplier', 'admin'), upload.single('image'), async (req, res) => {
+const productBodyValidators = [
+  body('name').trim().notEmpty().withMessage('Name is required').isLength({ max: 150 }).withMessage('Name is too long'),
+  body('cost_price').toFloat().isFloat({ min: 0 }).withMessage('cost_price must be a number >= 0'),
+  body('sale_price').toFloat().isFloat({ gt: 0 }).withMessage('sale_price must be > 0'),
+  body('description').optional().trim(),
+  body('category_id').optional({ values: 'falsy' }).isInt({ min: 1 }).withMessage('category_id must be a positive integer'),
+  body('supplier_id').optional({ values: 'falsy' }).isInt({ min: 1 }).withMessage('supplier_id must be a positive integer'),
+  handleValidation
+];
+router.post('/', authenticate, authorize('supplier', 'admin'), upload.single('image'), productBodyValidators, async (req, res) => {
   const { name, description, category_id, supplier_id, cost_price, sale_price } = req.body;
   const image_url = req.file ? `/uploads/${req.file.filename}` : (req.body.image_url || '');
   try {
@@ -173,6 +200,7 @@ router.post('/', authenticate, authorize('supplier', 'admin'), upload.single('im
        VALUES (?, ?, ?, ?, ?, ?, ?)`,
       [name, description, category_id || null, supplier_id || null, cost_price, sale_price, image_url]
     );
+    await invalidateAllRetailers();
     res.status(201).json({ id: result.insertId, image_url });
   } catch (err) {
     console.error(err);
@@ -180,7 +208,15 @@ router.post('/', authenticate, authorize('supplier', 'admin'), upload.single('im
   }
 });
 
-router.put('/:id', authenticate, authorize('supplier', 'admin'), upload.single('image'), async (req, res) => {
+router.put('/:id',
+  authenticate, authorize('supplier', 'admin'), upload.single('image'),
+  param('id').isInt({ min: 1 }).withMessage('Invalid product id'),
+  body('name').trim().notEmpty().withMessage('Name is required'),
+  body('cost_price').toFloat().isFloat({ min: 0 }).withMessage('cost_price must be a number >= 0'),
+  body('sale_price').toFloat().isFloat({ gt: 0 }).withMessage('sale_price must be > 0'),
+  body('category_id').optional({ values: 'falsy' }).isInt({ min: 1 }).withMessage('category_id must be a positive integer'),
+  handleValidation,
+  async (req, res) => {
   const { name, description, category_id, cost_price, sale_price } = req.body;
   let { image_url } = req.body;
   if (req.file) image_url = `/uploads/${req.file.filename}`;
@@ -189,15 +225,21 @@ router.put('/:id', authenticate, authorize('supplier', 'admin'), upload.single('
       `UPDATE products SET name=?, description=?, category_id=?, cost_price=?, sale_price=?, image_url=? WHERE id=?`,
       [name, description, category_id || null, cost_price, sale_price, image_url || '', req.params.id]
     );
+    await invalidateAllRetailers();
     res.json({ message: 'Product updated', image_url });
   } catch (err) {
     res.status(500).json({ error: 'Failed to update product' });
   }
 });
 
-router.delete('/:id', authenticate, authorize('supplier', 'admin'), async (req, res) => {
+router.delete('/:id',
+  authenticate, authorize('supplier', 'admin'),
+  param('id').isInt({ min: 1 }).withMessage('Invalid product id'),
+  handleValidation,
+  async (req, res) => {
   try {
     await pool.query('DELETE FROM products WHERE id = ?', [req.params.id]);
+    await invalidateAllRetailers();
     res.json({ message: 'Product deleted' });
   } catch (err) {
     res.status(500).json({ error: 'Failed to delete product' });
@@ -206,7 +248,10 @@ router.delete('/:id', authenticate, authorize('supplier', 'admin'), async (req, 
 
 // --- Reviews ---
 // Public: reviews for a product
-router.get('/:id/reviews', async (req, res) => {
+router.get('/:id/reviews',
+  param('id').isInt({ min: 1 }).withMessage('Invalid product id'),
+  handleValidation,
+  async (req, res) => {
   try {
     const [rows] = await pool.query(`
       SELECT r.id, r.rating, r.comment, r.created_at, u.name AS customer_name
@@ -221,13 +266,16 @@ router.get('/:id/reviews', async (req, res) => {
 });
 
 // Customer: submit a review for a purchased product (must have a delivered/history order containing it)
-router.post('/:id/reviews', authenticate, authorize('customer'), async (req, res) => {
-  const { rating, comment } = req.body;
-  const productId = req.params.id;
-  try {
-    if (!rating || rating < 1 || rating > 5) {
-      return res.status(400).json({ error: 'Rating must be between 1 and 5' });
-    }
+router.post('/:id/reviews',
+  authenticate, authorize('customer'),
+  param('id').isInt({ min: 1 }).withMessage('Invalid product id'),
+  body('rating').toInt().isInt({ min: 1, max: 5 }).withMessage('Rating must be between 1 and 5'),
+  body('comment').optional().trim(),
+  handleValidation,
+  async (req, res) => {
+    const { rating, comment } = req.body;
+    const productId = req.params.id;
+    try {
     // Verify the customer actually ordered this product
     const [purchase] = await pool.query(`
       SELECT oi.order_id FROM order_items oi

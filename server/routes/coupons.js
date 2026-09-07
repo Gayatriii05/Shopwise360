@@ -1,6 +1,8 @@
 const express = require('express');
+const { body, param } = require('express-validator');
 const pool = require('../config/db');
 const { authenticate, authorize } = require('../middleware/auth');
+const { handleValidation } = require('../utils/validate');
 
 const router = express.Router();
 
@@ -43,7 +45,21 @@ async function resolveCoupon(query, code, retailerId, orderValue, withForUpdate 
 
 // ---- Admin: coupon management ----
 
-router.post('/', authenticate, authorize('admin'), async (req, res) => {
+const couponFields = [
+  body('code').optional().trim().notEmpty().withMessage('code is required').isLength({ max: 50 }).withMessage('code is too long'),
+  body('description').optional().trim(),
+  body('discount_type').optional().isIn(['percent', 'flat']).withMessage('discount_type must be percent or flat'),
+  body('discount_value').optional().toFloat().isFloat({ gt: 0 }).withMessage('discount_value must be > 0'),
+  body('min_order_value').optional({ values: 'falsy' }).toFloat().isFloat({ min: 0 }).withMessage('min_order_value must be >= 0'),
+  body('max_discount').optional({ values: 'falsy' }).toFloat().isFloat({ min: 0 }).withMessage('max_discount must be >= 0'),
+  body('usage_limit').optional({ values: 'falsy' }).toInt().isInt({ min: 1 }).withMessage('usage_limit must be a positive integer'),
+  body('active').optional().toBoolean(),
+  body('valid_from').optional({ values: 'falsy' }).isISO8601().withMessage('valid_from must be a date'),
+  body('valid_to').optional({ values: 'falsy' }).isISO8601().withMessage('valid_to must be a date'),
+  body('retailer_id').optional({ values: 'falsy' }).isInt({ min: 1 }).withMessage('retailer_id must be a positive integer')
+];
+
+router.post('/', authenticate, authorize('admin'), couponFields, handleValidation, async (req, res) => {
   const {
     code, description, discount_type, discount_value, min_order_value = 0,
     max_discount = null, active = true, valid_from = null, valid_to = null,
@@ -82,17 +98,25 @@ router.get('/', authenticate, authorize('admin'), async (req, res) => {
   }
 });
 
-router.get('/:id', authenticate, authorize('admin'), async (req, res) => {
-  try {
-    const [rows] = await pool.query('SELECT * FROM coupons WHERE id = ?', [req.params.id]);
-    if (!rows.length) return res.status(404).json({ error: 'Coupon not found' });
-    res.json(rows[0]);
-  } catch (err) {
-    res.status(500).json({ error: 'Failed to fetch coupon' });
-  }
-});
+router.get('/:id',
+  authenticate, authorize('admin'),
+  param('id').isInt({ min: 1 }).withMessage('Invalid coupon id'),
+  handleValidation,
+  async (req, res) => {
+    try {
+      const [rows] = await pool.query('SELECT * FROM coupons WHERE id = ?', [req.params.id]);
+      if (!rows.length) return res.status(404).json({ error: 'Coupon not found' });
+      res.json(rows[0]);
+    } catch (err) {
+      res.status(500).json({ error: 'Failed to fetch coupon' });
+    }
+  });
 
-router.put('/:id', authenticate, authorize('admin'), async (req, res) => {
+router.put('/:id',
+  authenticate, authorize('admin'),
+  param('id').isInt({ min: 1 }).withMessage('Invalid coupon id'),
+  couponFields, handleValidation,
+  async (req, res) => {
   const allowed = ['code', 'description', 'discount_type', 'discount_value', 'min_order_value',
     'max_discount', 'active', 'valid_from', 'valid_to', 'usage_limit', 'retailer_id'];
   const sets = [];
@@ -114,7 +138,11 @@ router.put('/:id', authenticate, authorize('admin'), async (req, res) => {
   }
 });
 
-router.delete('/:id', authenticate, authorize('admin'), async (req, res) => {
+router.delete('/:id',
+  authenticate, authorize('admin'),
+  param('id').isInt({ min: 1 }).withMessage('Invalid coupon id'),
+  handleValidation,
+  async (req, res) => {
   try {
     await pool.query('DELETE FROM coupons WHERE id = ?', [req.params.id]);
     res.json({ message: 'Coupon deleted' });
@@ -124,23 +152,26 @@ router.delete('/:id', authenticate, authorize('admin'), async (req, res) => {
 });
 
 // ---- Customer: validate a code against a prospective order ----
-router.post('/validate', authenticate, authorize('customer'), async (req, res) => {
-  const { code, order_value, retailer_id } = req.body || {};
-  if (!code || !order_value || !retailer_id) {
-    return res.status(400).json({ error: 'code, order_value and retailer_id are required' });
-  }
-  const result = await resolveCoupon((q, p) => pool.query(q, p), code, retailer_id, order_value);
-  if (!result.ok) {
-    return res.status(400).json({ valid: false, reason: result.reason });
-  }
-  res.json({
-    valid: true,
-    coupon_id: result.coupon.id,
-    code: result.coupon.code,
-    discount: result.discount,
-    discount_type: result.coupon.discount_type,
-    discount_value: result.coupon.discount_value
+router.post('/validate',
+  authenticate, authorize('customer'),
+  body('code').trim().notEmpty().withMessage('code is required'),
+  body('order_value').toFloat().isFloat({ gt: 0 }).withMessage('order_value must be > 0'),
+  body('retailer_id').isInt({ min: 1 }).withMessage('retailer_id must be a positive integer'),
+  handleValidation,
+  async (req, res) => {
+    const { code, order_value, retailer_id } = req.body || {};
+    const result = await resolveCoupon((q, p) => pool.query(q, p), code, retailer_id, order_value);
+    if (!result.ok) {
+      return res.status(400).json({ valid: false, reason: result.reason, error: result.reason });
+    }
+    res.json({
+      valid: true,
+      coupon_id: result.coupon.id,
+      code: result.coupon.code,
+      discount: result.discount,
+      discount_type: result.coupon.discount_type,
+      discount_value: result.coupon.discount_value
+    });
   });
-});
 
 module.exports = { router, resolveCoupon };

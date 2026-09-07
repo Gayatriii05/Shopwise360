@@ -90,18 +90,23 @@ async function main() {
   record('#ml repeat reads write NOTHING (bounded logging)', sqlCount('demand_predictions') === demandBefore && sqlCount('recommendations_log') === recBefore,
     `demand ${demandBefore}->${sqlCount('demand_predictions')}, rec ${recBefore}->${sqlCount('recommendations_log')}`);
 
-  // force a real recompute on demand: drop the artifact, next read lazy-retrains
+  // force a real recompute on demand: drop the artifact, next read lazy-retrains.
+  // Clear today's rows for retailer 1 first and re-baseline so the "recompute
+  // writes one row per product/day" assertion is deterministic even when rows for
+  // today already exist (uniq_demand_day upserts refresh in place, count stays flat).
+  db(`DELETE FROM demand_predictions WHERE retailer_id=1 AND prediction_date = CURDATE()`);
+  const demandBase = sqlCount('demand_predictions');
   const demandArtifact = path.join(ML_MODELS, 'demand', 'retailer_1.joblib');
   const demandHeld = fs.existsSync(demandArtifact);
   try {
     if (demandHeld) fs.unlinkSync(demandArtifact);
   } catch (e) { /* ignore */ }
   const forceD = await api('get', '/ml/predict-demand/1', { token: roles.retailer.token });
-  const written = sqlCount('demand_predictions') - demandBefore;
+  const written = sqlCount('demand_predictions') - demandBase;
   record('#ml stale model -> lazy retrain + computed=true', String(forceD.headers['x-ml-computed']).toLowerCase() === 'true' && written === forceD.data.length,
     `computed=${forceD.headers['x-ml-computed']} rows_written=${written}`);
   const forceD2 = await api('get', '/ml/predict-demand/1', { token: roles.retailer.token });
-  record('#ml recompute dedupe via uniq_demand_day (no growth on re-read)', sqlCount('demand_predictions') === demandBefore + written,
+  record('#ml recompute dedupe via uniq_demand_day (no growth on re-read)', sqlCount('demand_predictions') === demandBase + written,
     `stable at ${sqlCount('demand_predictions')}`);
 
   // force a real recompute on recommend

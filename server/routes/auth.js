@@ -1,21 +1,23 @@
 const express = require('express');
 const bcrypt = require('bcryptjs');
-const jwt = require('jsonwebtoken');
-const { body, validationResult } = require('express-validator');
+const { body } = require('express-validator');
 const pool = require('../config/db');
 const { authenticate } = require('../middleware/auth');
+const { authLimiter, registerLimiter } = require('../middleware/rateLimiter');
+const { handleValidation } = require('../utils/validate');
+const { signAccessToken, issueRefreshToken, rotateRefreshToken, revokeRefreshToken } = require('../services/tokenStore');
 
 const router = express.Router();
 
 router.post('/register',
-  body('name').notEmpty(),
-  body('email').isEmail(),
-  body('password').isLength({ min: 6 }),
-  body('role').isIn(['customer', 'retailer', 'supplier', 'admin']),
+  registerLimiter,
+  body('name').trim().notEmpty().withMessage('Name is required').isLength({ max: 100 }).withMessage('Name is too long'),
+  body('email').isEmail().withMessage('A valid email is required').normalizeEmail(),
+  body('password').isLength({ min: 6 }).withMessage('Password must be at least 6 characters'),
+  body('role').isIn(['customer', 'retailer', 'supplier', 'admin']).withMessage('Invalid role'),
+  body('extra').optional().isObject().withMessage('extra must be an object'),
+  handleValidation,
   async (req, res) => {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
-
     const { name, email, password, role, extra } = req.body;
     try {
       const [existing] = await pool.query('SELECT id FROM users WHERE email = ?', [email]);
@@ -36,8 +38,14 @@ router.post('/register',
           [userId, extra?.company_name || `${name}'s Supply Co`, extra?.contact_phone || '']);
       }
 
-      const token = jwt.sign({ id: userId, role, email }, process.env.JWT_SECRET, { expiresIn: '7d' });
-      res.status(201).json({ token, user: { id: userId, name, email, role } });
+      const accessToken = signAccessToken({ id: userId, role, email });
+      const refreshToken = await issueRefreshToken(userId);
+      res.status(201).json({
+        token: accessToken,
+        accessToken,
+        refreshToken,
+        user: { id: userId, name, email, role }
+      });
     } catch (err) {
       console.error(err);
       res.status(500).json({ error: 'Registration failed' });
@@ -77,12 +85,11 @@ router.get('/me', authenticate, async (req, res) => {
 });
 
 router.post('/login',
-  body('email').isEmail(),
-  body('password').notEmpty(),
+  authLimiter,
+  body('email').isEmail().withMessage('A valid email is required').normalizeEmail(),
+  body('password').notEmpty().withMessage('Password is required'),
+  handleValidation,
   async (req, res) => {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
-
     const { email, password } = req.body;
     try {
       const [rows] = await pool.query('SELECT * FROM users WHERE email = ?', [email]);
@@ -92,15 +99,50 @@ router.post('/login',
       const match = await bcrypt.compare(password, user.password_hash);
       if (!match) return res.status(401).json({ error: 'Invalid credentials' });
 
-      const token = jwt.sign(
-        { id: user.id, role: user.role, email: user.email },
-        process.env.JWT_SECRET,
-        { expiresIn: '7d' }
-      );
-      res.json({ token, user: { id: user.id, name: user.name, email: user.email, role: user.role } });
+      const accessToken = signAccessToken(user);
+      const refreshToken = await issueRefreshToken(user.id);
+      res.json({
+        token: accessToken,
+        accessToken,
+        refreshToken,
+        user: { id: user.id, name: user.name, email: user.email, role: user.role }
+      });
     } catch (err) {
       console.error(err);
       res.status(500).json({ error: 'Login failed' });
+    }
+  }
+);
+
+router.post('/logout',
+  body('refreshToken').optional().notEmpty().withMessage('refreshToken must not be empty'),
+  handleValidation,
+  async (req, res) => {
+    try {
+      await revokeRefreshToken(req.body?.refreshToken);
+      res.json({ message: 'Logged out' });
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ error: 'Logout failed' });
+    }
+  }
+);
+
+// Rotate a refresh token → new access + refresh pair (opaque, stored hashed).
+// Unknown/revoked/expired tokens trigger reuse detection and revoke ALL of the
+// user's refresh tokens.
+router.post('/refresh',
+  body('refreshToken').notEmpty().withMessage('refreshToken is required'),
+  handleValidation,
+  async (req, res) => {
+    const { refreshToken } = req.body;
+    try {
+      const result = await rotateRefreshToken(refreshToken);
+      if (!result) return res.status(401).json({ error: 'Invalid refresh token' });
+      res.json(result);
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ error: 'Refresh failed' });
     }
   }
 );

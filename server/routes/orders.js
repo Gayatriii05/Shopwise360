@@ -1,8 +1,11 @@
 const express = require('express');
+const { body, param } = require('express-validator');
 const pool = require('../config/db');
 const { authenticate, authorize } = require('../middleware/auth');
 const { emitNewOrder, emitOrderStatusChange, emitLowStockAlert, emitDashboardUpdate } = require('../socket');
 const { resolveCoupon } = require('./coupons');
+const { handleValidation } = require('../utils/validate');
+const { invalidateRetailer } = require('../services/dashboardCache');
 
 const router = express.Router();
 
@@ -10,34 +13,41 @@ const VALID_STATUSES = ['pending', 'confirmed', 'shipped', 'delivered', 'cancell
 const STATUS_FLOW = ['pending', 'confirmed', 'shipped', 'delivered'];
 
 // Customer places an order (with items array, optional coupon_code)
-router.post('/', authenticate, authorize('customer'), async (req, res) => {
-  const { retailer_id, items } = req.body; // items: [{ product_id, quantity }]
-  if (!retailer_id) return res.status(400).json({ error: 'retailer_id is required' });
-  if (!Array.isArray(items) || !items.length) {
-    return res.status(400).json({ error: 'items must be a non-empty array' });
-  }
-  const conn = await pool.getConnection();
-  try {
-    await conn.beginTransaction();
+router.post('/',
+  authenticate, authorize('customer'),
+  body('retailer_id').isInt({ min: 1 }).withMessage('retailer_id must be a positive integer'),
+  body('items').isArray({ min: 1 }).withMessage('items must be a non-empty array'),
+  body('items.*.product_id').isInt({ min: 1 }).withMessage('Each item needs a valid product_id'),
+  body('items.*.quantity').isInt({ min: 1 }).withMessage('Each item needs quantity >= 1'),
+  body('coupon_code').optional().trim().isString(),
+  handleValidation,
+  async (req, res) => {
+    const { retailer_id, items } = req.body; // items: [{ product_id, quantity }]
+    const conn = await pool.getConnection();
+    try {
+      await conn.beginTransaction();
 
-    let total = 0;
-    const priced = [];
-    for (const item of items) {
-      const qty = Number(item.quantity);
-      if (!item.product_id || !qty || qty < 1) {
-        return res.status(400).json({ error: 'Each item needs a valid product_id and quantity >= 1' });
-      }
-      const [[product]] = await conn.query('SELECT sale_price, cost_price FROM products WHERE id = ?', [item.product_id]);
-      if (!product) throw new Error(`Product ${item.product_id} not found`);
+      let total = 0;
+      const priced = [];
+      for (const item of items) {
+        const qty = Number(item.quantity);
+        const [[product]] = await conn.query('SELECT sale_price, cost_price FROM products WHERE id = ?', [item.product_id]);
+        if (!product) {
+          const nf = new Error(`Product ${item.product_id} not found`);
+          nf.statusCode = 400;
+          throw nf;
+        }
 
-      // Check inventory availability
-      const [[inv]] = await conn.query(
-        'SELECT quantity FROM inventory WHERE product_id = ? AND retailer_id = ?',
-        [item.product_id, retailer_id]
-      );
-      if (!inv || inv.quantity < qty) {
-        throw new Error(`Insufficient stock for product ${item.product_id}`);
-      }
+        // Check inventory availability
+        const [[inv]] = await conn.query(
+          'SELECT quantity FROM inventory WHERE product_id = ? AND retailer_id = ?',
+          [item.product_id, retailer_id]
+        );
+        if (!inv || inv.quantity < qty) {
+          const err = new Error(`Insufficient stock for product ${item.product_id}`);
+          err.statusCode = 409;
+          throw err;
+        }
 
       const lineTotal = Number(product.sale_price) * qty;
       total += lineTotal;
@@ -91,7 +101,9 @@ router.post('/', authenticate, authorize('customer'), async (req, res) => {
         [item.quantity, item.product_id, retailer_id, item.quantity]
       );
       if (invUpdate.affectedRows === 0) {
-        throw new Error(`Insufficient stock for product ${item.product_id}`);
+        const err = new Error(`Insufficient stock for product ${item.product_id}`);
+        err.statusCode = 409;
+        throw err;
       }
 
       // Record sale + profit (revenue already reflects any coupon allocation)
@@ -122,6 +134,7 @@ router.post('/', authenticate, authorize('customer'), async (req, res) => {
       }
     } catch (_e) { /* socket is best-effort */ }
 
+    await invalidateRetailer(retailer_id);
     res.status(201).json({ orderId, total: finalTotal, discount });
   } catch (err) {
     await conn.rollback();
@@ -133,7 +146,11 @@ router.post('/', authenticate, authorize('customer'), async (req, res) => {
 });
 
 // Customer: order history with items + current status
-router.get('/customer/:customerId', authenticate, async (req, res) => {
+router.get('/customer/:customerId',
+  authenticate,
+  param('customerId').isInt({ min: 1 }).withMessage('Invalid customer id'),
+  handleValidation,
+  async (req, res) => {
   try {
     const [rows] = await pool.query(`
       SELECT o.id, o.status, o.total_amount, o.created_at, o.retailer_id,
@@ -160,7 +177,11 @@ router.get('/customer/:customerId', authenticate, async (req, res) => {
 });
 
 // Retailer/Admin: orders for a retailer with customer info + items
-router.get('/retailer/:retailerId', authenticate, authorize('retailer', 'admin'), async (req, res) => {
+router.get('/retailer/:retailerId',
+  authenticate, authorize('retailer', 'admin'),
+  param('retailerId').isInt({ min: 1 }).withMessage('Invalid retailer id'),
+  handleValidation,
+  async (req, res) => {
   try {
     const [rows] = await pool.query(`
       SELECT o.id, o.status, o.total_amount, o.created_at, o.customer_id,
@@ -189,13 +210,15 @@ router.get('/retailer/:retailerId', authenticate, authorize('retailer', 'admin')
 });
 
 // Retailer/Admin: advance order status (enforces pending -> confirmed -> shipped -> delivered)
-router.put('/:id/status', authenticate, authorize('retailer', 'admin'), async (req, res) => {
-  const { status } = req.body;
-  if (!VALID_STATUSES.includes(status)) {
-    return res.status(400).json({ error: `Status must be one of: ${VALID_STATUSES.join(', ')}` });
-  }
-  try {
-    const [rows] = await pool.query('SELECT status FROM orders WHERE id = ?', [req.params.id]);
+router.put('/:id/status',
+  authenticate, authorize('retailer', 'admin'),
+  param('id').isInt({ min: 1 }).withMessage('Invalid order id'),
+  body('status').isIn(VALID_STATUSES).withMessage(`Status must be one of: ${VALID_STATUSES.join(', ')}`),
+  handleValidation,
+  async (req, res) => {
+    const { status } = req.body;
+    try {
+      const [rows] = await pool.query('SELECT status FROM orders WHERE id = ?', [req.params.id]);
     if (!rows.length) return res.status(404).json({ error: 'Order not found' });
     const current = rows[0].status;
 
@@ -214,6 +237,7 @@ router.put('/:id/status', authenticate, authorize('retailer', 'admin'), async (r
         const ord = orderRows[0];
         emitOrderStatusChange(ord.customer_id, ord.retailer_id, req.params.id, status);
         emitDashboardUpdate(ord.retailer_id); // refresh retailer dashboard numbers
+        await invalidateRetailer(ord.retailer_id);
       }
     } catch (_e) {}
     res.json({ message: 'Order status updated', status });

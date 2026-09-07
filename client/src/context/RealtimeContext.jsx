@@ -1,6 +1,8 @@
 import { createContext, useContext, useEffect, useRef, useState } from 'react';
 import { io } from 'socket.io-client';
 import { useAuth } from './AuthContext';
+import { getAccessToken } from '../api/authStorage';
+import { refreshSession } from '../api/client';
 
 const RealtimeContext = createContext(null);
 
@@ -11,9 +13,10 @@ export function RealtimeProvider({ children }) {
   const socketRef = useRef(null);
   const [connected, setConnected] = useState(false);
   const listenersRef = useRef(new Map()); // event -> Set<handler>
+  const refreshingRef = useRef(false);
 
   useEffect(() => {
-    const token = localStorage.getItem('token');
+    const token = getAccessToken();
     if (!token || !user) {
       if (socketRef.current) { socketRef.current.disconnect(); socketRef.current = null; setConnected(false); }
       return;
@@ -23,6 +26,22 @@ export function RealtimeProvider({ children }) {
     socketRef.current = socket;
     socket.on('connect', () => setConnected(true));
     socket.on('disconnect', () => setConnected(false));
+
+    // If the access token expired between page load and socket handshake,
+    // refresh it and reconnect with the fresh token.
+    socket.on('connect_error', async () => {
+      if (refreshingRef.current) return;
+      if (socket.active) return;
+      refreshingRef.current = true;
+      const newToken = await refreshSession();
+      refreshingRef.current = false;
+      if (newToken) {
+        socket.auth = { token: newToken };
+        socket.connect();
+      } else {
+        setConnected(false);
+      }
+    });
 
     // Dispatch incoming events to registered handlers
     const handlers = {
@@ -43,6 +62,7 @@ export function RealtimeProvider({ children }) {
       socketRef.current = null;
       setConnected(false);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
 
   const on = (event, handler) => {

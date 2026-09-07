@@ -1,6 +1,8 @@
 const express = require('express');
+const { query } = require('express-validator');
 const pool = require('../config/db');
 const { authenticate, authorize } = require('../middleware/auth');
+const { handleValidation } = require('../utils/validate');
 const PDFDocument = require('pdfkit');
 
 const router = express.Router();
@@ -73,8 +75,10 @@ function handleError(res, err, fallback) {
   res.status(err.statusCode || 500).json({ error: err.message || fallback });
 }
 
+const retailerScope = query('retailer_id').optional().isInt({ min: 1 }).withMessage('retailer_id must be a positive integer');
+
 // ---- CSV exports ----
-router.get('/sales/csv', authenticate, authorize('retailer', 'admin'), async (req, res) => {
+router.get('/sales/csv', authenticate, authorize('retailer', 'admin'), retailerScope, handleValidation, async (req, res) => {
   try {
     const retailerId = await resolveScope(req);
     const { sql, params } = salesQuery(retailerId);
@@ -99,7 +103,7 @@ router.get('/sales/csv', authenticate, authorize('retailer', 'admin'), async (re
   }
 });
 
-router.get('/inventory/csv', authenticate, authorize('retailer', 'admin'), async (req, res) => {
+router.get('/inventory/csv', authenticate, authorize('retailer', 'admin'), retailerScope, handleValidation, async (req, res) => {
   try {
     const retailerId = await resolveScope(req);
     const { sql, params } = inventoryQuery(retailerId);
@@ -155,7 +159,7 @@ function sendPDF(res, filename, title, headers, rows) {
   doc.end();
 }
 
-router.get('/sales/pdf', authenticate, authorize('retailer', 'admin'), async (req, res) => {
+router.get('/sales/pdf', authenticate, authorize('retailer', 'admin'), retailerScope, handleValidation, async (req, res) => {
   try {
     const retailerId = await resolveScope(req);
     const { sql, params } = salesQuery(retailerId);
@@ -175,7 +179,7 @@ router.get('/sales/pdf', authenticate, authorize('retailer', 'admin'), async (re
   }
 });
 
-router.get('/inventory/pdf', authenticate, authorize('retailer', 'admin'), async (req, res) => {
+router.get('/inventory/pdf', authenticate, authorize('retailer', 'admin'), retailerScope, handleValidation, async (req, res) => {
   try {
     const retailerId = await resolveScope(req);
     const { sql, params } = inventoryQuery(retailerId);
