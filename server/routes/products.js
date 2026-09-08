@@ -7,6 +7,7 @@ const pool = require('../config/db');
 const { authenticate, authorize } = require('../middleware/auth');
 const { handleValidation } = require('../utils/validate');
 const { invalidateAllRetailers } = require('../services/dashboardCache');
+const { recordAudit } = require('../services/auditLogger');
 
 const router = express.Router();
 
@@ -202,6 +203,7 @@ router.post('/', authenticate, authorize('supplier', 'admin'), upload.single('im
     );
     await invalidateAllRetailers();
     res.status(201).json({ id: result.insertId, image_url });
+    recordAudit(req, 'product.create', 'product', result.insertId, { name, sale_price });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Failed to create product' });
@@ -238,8 +240,10 @@ router.delete('/:id',
   handleValidation,
   async (req, res) => {
   try {
+    const [rows] = await pool.query('SELECT name FROM products WHERE id = ?', [req.params.id]);
     await pool.query('DELETE FROM products WHERE id = ?', [req.params.id]);
     await invalidateAllRetailers();
+    recordAudit(req, 'product.delete', 'product', req.params.id, { name: rows.length ? rows[0].name : null });
     res.json({ message: 'Product deleted' });
   } catch (err) {
     res.status(500).json({ error: 'Failed to delete product' });

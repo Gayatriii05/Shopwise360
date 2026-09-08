@@ -7,6 +7,7 @@
     "socket:e2e": "node socket-e2e.cjs",
     "verify:phase3": "node verify-phase3.cjs",
     "verify:phase4": "node verify-phase4.cjs",
+    "verify:phase7": "node verify-phase7.cjs",
     "test:unit": "jest --config jest.config.cjs"
   },
   "dependencies": {

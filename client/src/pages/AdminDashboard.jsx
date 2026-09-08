@@ -2,10 +2,13 @@ import { useEffect, useState } from 'react';
 import { BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, Tooltip, CartesianGrid, ResponsiveContainer, Legend } from 'recharts';
 import api, { downloadFile } from '../api/client';
 import EmptyState from '../components/EmptyState';
+import Pagination from '../components/Pagination';
 import { Skeleton, SkeletonTable } from '../components/Skeleton';
 
 const COLORS = ['#0f172a', '#059669', '#f59e0b', '#dc2626'];
 const fmtAgo = (s) => (s < 0 ? '—' : s < 60 ? `${Math.round(s)}s` : s < 3600 ? `${Math.round(s / 60)}m` : `${Math.round(s / 3600)}h`);
+const fmtDate = (s) => (s ? new Date(s).toLocaleString() : '—');
+const AUDIT_ACTIONS = ['', 'coupon.create', 'coupon.delete', 'product.create', 'product.delete', 'order.status', 'model.retrain'];
 
 export default function AdminDashboard() {
   const [data, setData] = useState(null);
@@ -15,6 +18,12 @@ export default function AdminDashboard() {
   const [coupons, setCoupons] = useState([]);
   const [couponForm, setCouponForm] = useState({ code: '', description: '', discount_type: 'percent', discount_value: '', min_order_value: '', max_discount: '', usage_limit: '' });
   const [couponMsg, setCouponMsg] = useState('');
+  const [audit, setAudit] = useState([]);
+  const [auditPage, setAuditPage] = useState(1);
+  const [auditPages, setAuditPages] = useState(1);
+  const [auditTotal, setAuditTotal] = useState(0);
+  const [auditFilter, setAuditFilter] = useState('');
+  const [auditLoading, setAuditLoading] = useState(true);
 
   useEffect(() => {
     api.get('/dashboard/admin/summary')
@@ -28,6 +37,20 @@ export default function AdminDashboard() {
 
   const loadCoupons = () => api.get('/coupons').then(({ data }) => setCoupons(data)).catch(() => setCoupons([]));
   useEffect(() => { loadCoupons(); }, []);
+
+  const loadAudit = (page = 1) => {
+    setAuditLoading(true);
+    api.get('/audit', { params: { page, limit: 10, ...(auditFilter ? { action: auditFilter } : {}) } })
+      .then(({ data }) => {
+        setAudit(data.items);
+        setAuditPage(data.page);
+        setAuditPages(data.totalPages);
+        setAuditTotal(data.total);
+      })
+      .catch(() => setAudit([]))
+      .finally(() => setAuditLoading(false));
+  };
+  useEffect(() => { loadAudit(1); }, [auditFilter]);
 
   const retrain = async () => {
     setRetraining(true);
@@ -176,6 +199,64 @@ export default function AdminDashboard() {
               ))}
             </tbody>
           </table>
+        )}
+      </section>
+
+      <section>
+        <div className="flex flex-wrap items-center justify-between gap-3 mb-2">
+          <div className="flex items-center gap-3">
+            <h3 className="font-semibold text-slate-700">📜 Audit Log</h3>
+            <span className="text-xs text-slate-400">{auditTotal} event{auditTotal === 1 ? '' : 's'}</span>
+          </div>
+          <select
+            value={auditFilter}
+            onChange={(e) => setAuditFilter(e.target.value)}
+            className="border rounded px-2 py-1.5 text-xs bg-white"
+            aria-label="Filter audit log by action"
+          >
+            {AUDIT_ACTIONS.map((a) => (
+              <option key={a || 'all'} value={a}>{a || 'All actions'}</option>
+            ))}
+          </select>
+        </div>
+        {auditLoading ? (
+          <SkeletonTable rows={5} cols={5} />
+        ) : audit.length === 0 ? (
+          <EmptyState icon="📜" title="No audit events yet" message="Admin actions (coupon/product/order/model) appear here." />
+        ) : (
+          <div className="bg-white border rounded overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-slate-100">
+                <tr>
+                  <th className="p-2 text-left">When</th>
+                  <th className="p-2 text-left">Actor</th>
+                  <th className="p-2 text-left">Role</th>
+                  <th className="p-2 text-left">Action</th>
+                  <th className="p-2 text-left">Entity</th>
+                  <th className="p-2 text-left">Details</th>
+                </tr>
+              </thead>
+              <tbody>
+                {audit.map((e) => (
+                  <tr key={e.id} className="border-t">
+                    <td className="p-2 whitespace-nowrap text-slate-500">{fmtDate(e.created_at)}</td>
+                    <td className="p-2">{e.actor_name || `#${e.actor_id}`}</td>
+                    <td className="p-2">
+                      <span className="text-xs px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 border border-slate-200">{e.actor_role}</span>
+                    </td>
+                    <td className="p-2 font-mono text-[12px] text-slate-700">{e.action}</td>
+                    <td className="p-2">{e.entity_type}{e.entity_id != null ? ` #${e.entity_id}` : ' —'}</td>
+                    <td className="p-2 text-slate-500 text-[12px]">{JSON.stringify(e.details || {})}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {auditPages > 1 && (
+              <div className="p-3">
+                <Pagination page={auditPage} totalPages={auditPages} onPageChange={loadAudit} />
+              </div>
+            )}
+          </div>
         )}
       </section>
 

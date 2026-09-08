@@ -12,3 +12,4 @@ ml-service/models/*.joblib
 ml-service/models/**/*.joblib
 server/uploads/
 *.log
+*.log.err

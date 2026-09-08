@@ -5,9 +5,64 @@ and a Python (Scikit-learn) microservice for recommendations + demand forecastin
 
 ## Stack
 - **Frontend:** React (Vite), React Router, Recharts, Tailwind (CDN)
-- **Backend:** Node.js, Express, MySQL2, JWT auth, express-validator, node-cron
+- **Backend:** Node.js, Express, MySQL2, JWT auth, express-validator, node-cron, Nodemailer
 - **ML service:** Python, Flask, Scikit-learn, Pandas
 - **Database:** MySQL 8
+
+## Quick start (clone → running in < 5 minutes)
+
+Prereqs: **Node 18+**, **Python 3.9+**, and a locally running **MySQL 8** server.
+
+```bash
+# 1. Get the code
+git clone <this-repo> shopwise360 && cd shopwise360
+
+# 2. Create the database (tables + indexes)
+mysql -u root -p < database/schema.sql
+
+# 3. Backend API (port 5000)
+cd server
+cp .env.example .env          # set DB_PASSWORD + JWT_SECRET
+npm install
+npm run seed                  # demo users + sample products/sales/orders
+npm run dev
+
+# 4. ML microservice (port 6000) — recommendations + demand forecasts
+cd ../ml-service
+cp .env.example .env          # set DB_PASSWORD
+python -m venv venv
+venv\Scripts\activate         # Windows;  source venv/bin/activate (Mac/Linux)
+pip install -r requirements.txt
+python app.py
+
+# 5. Web app (port 3001)
+cd ../client
+cp .env.example .env
+npm install
+npm run dev
+```
+
+Open **http://localhost:3001** and sign in with any demo account below.
+
+> Emails (order confirmation, status changes, low-stock alerts) work **out of the box** in
+> dev via [Ethereal](https://ethereal.email) — no SMTP config needed. Each message's preview
+> URL is printed in the server console. Switch to real SMTP (or the JSON dump mode) via
+> `MAIL_TRANSPORT` (see env vars). API docs are served live at `/api/docs`.
+
+### Demo logins (password `Password123` for all)
+- admin@shopwise.com — Admin
+- retailer@shopwise.com — Retailer
+- supplier@shopwise.com — Supplier
+- customer@shopwise.com — Customer
+
+## Features by role
+
+| Role | What they can do |
+|---|---|
+| **Customer** | Browse/search/filter products, place orders with coupon codes (auto discount), track order status in real time, review only purchased items, get personalized recommendations, maintain a wishlist, receive email confirmations + status alerts |
+| **Retailer** | Manage inventory (bulk, per-product), get low-stock alerts (live socket + email), fulfil orders through the status flow (pending → confirmed → shipped → delivered), see revenue/profit KPIs, top products, daily sales, and per-product demand forecasts, export CSV/PDF reports |
+| **Supplier** | Maintain products (with image upload), see sales performance across retailers |
+| **Admin** | Platform-wide revenue/profit KPIs, per-retailer revenue, user breakdown, ML model health + on-demand retrain, coupon management, CSV/PDF reports, **live API docs** (`/api/docs`), and a **paginated audit log** of admin actions |
 
 ## Project structure
 ```
@@ -87,6 +142,13 @@ Open http://localhost:3001
 | `REGISTER_RATE_WINDOW_MS` | `3600000` | Rate-limit window (ms) for register |
 | `REDIS_URL` | `redis://localhost:6379` | Optional Redis for dashboard cache (app **fails open** to DB when unreachable) |
 | `DASH_CACHE_TTL` | `60` | Dashboard cache TTL in seconds |
+| `MAIL_TRANSPORT` | `ethereal` | How emails are sent: `ethereal` (dev, auto test account + preview URLs), `smtp` (real SMTP/Hosted), `json` (dry-run: dump each message to `MAIL_DUMP_DIR`) |
+| `SMTP_HOST` | — | SMTP server host (used when `MAIL_TRANSPORT=smtp`) |
+| `SMTP_PORT` | `587` | SMTP port |
+| `SMTP_SECURE` | `false` | `true` for port 465 |
+| `SMTP_USER` / `SMTP_PASS` | — | SMTP credentials |
+| `MAIL_FROM` | `ShopWise 360 <no-reply@shopwise360.local>` | Sender shown on outgoing mail |
+| `MAIL_DUMP_DIR` | `./mail-dump` | Where `MAIL_TRANSPORT=json` writes composed messages (JSON files) |
 
 ### ML service (`ml-service/.env`) — copy from `ml-service/.env.example`
 | Variable | Default | Purpose |
@@ -107,6 +169,7 @@ Open http://localhost:3001
 ## Tests
 - **API/Jest** (`tests/`): `npm run test:unit` — auth, transaction-safe orders, RBAC. Requires MySQL + the server running on `:5000`.
 - **SQL regressions** (`tests/`): `npm run verify:phase0`, `verify:phase3`, `verify:phase4`, plus `socket:e2e`.
+- **Phase 7 features** (`tests/`): `npm run verify:phase7` — email notifications (JSON mail-dump mode), Swagger spec/UI, and the admin audit log. Spawns its own server on `:5007`.
 - **ML/pytest** (`ml-service/`): `pip install -r requirements-dev.txt && python -m pytest` — cold-start recommender + demand fallback unit tests (no DB/network needed).
 
 ## What's implemented
@@ -119,17 +182,18 @@ Open http://localhost:3001
 - Scikit-learn recommender (item-based collaborative filtering, cosine similarity, popularity cold-start fallback)
 - Scikit-learn demand forecast (per-product linear regression on sales history, avg fallback)
 - Hourly cron job auto-generating low-stock alerts
+- Email notifications via Nodemailer (Ethereal dev transport or real SMTP): order confirmation + status changes to customers, low-stock alerts to retailers
+- Live API docs via swagger-jsdoc + swagger-ui-express (`/api/docs`) with a boot-time route-coverage check
+- Admin audit log (`audit_log` table): coupon/product create/delete, order status changes, model retrains — browsable in the Admin dashboard
 - Validation (consistent `{ error, errors }` 400s), rate limiting (login/register), refresh-token rotation + reuse detection
 - Global error handler (malformed JSON → 400, multer → 400/413)
 - Docker Compose (MySQL + Redis + server + ML + client) + Dockerfiles + `.dockerignore`
 - Automation-style regression suites + Jest integration tests + pytest unit tests
 
 ## What's intentionally left for you to extend (with OpenCode)
-- Image upload for products (multer)
 - Payment integration (mock or Razorpay/Stripe)
-- Pagination, search & filters on product listing
-- Order status tracking UI for retailer (backend flow is tested)
-- Better ML: real train/test split, scheduled retraining via `/ml/retrain`, model drift monitoring
+- Order status tracking UI polish + cancellation reasons
+- Better ML: real train/test split, feature engineering, scheduled retraining automation, model drift monitoring
 - Real Redis + Docker deployment on a hosted provider (configs ship in `render.yaml` / `vercel.json` / Dockerfiles)
 
 ## API overview
@@ -146,3 +210,7 @@ Open http://localhost:3001
 | GET | /api/dashboard/supplier/:id/summary | supplier, admin |
 | GET | /api/ml/recommend/:customerId | authenticated |
 | GET | /api/ml/predict-demand/:retailerId | authenticated |
+| POST | /api/ml/retrain | admin |
+| GET | /api/audit?page=&limit=&action=&entity_type=&entity_id= | admin |
+| GET | /api/docs | public (Swagger UI) |
+| GET | /api/docs/swagger.json | public (raw OpenAPI spec) |

@@ -4,6 +4,7 @@ const { body, param } = require('express-validator');
 const pool = require('../config/db');
 const { authenticate, authorize } = require('../middleware/auth');
 const { handleValidation } = require('../utils/validate');
+const { recordAudit } = require('../services/auditLogger');
 
 const router = express.Router();
 const ML_URL = process.env.ML_SERVICE_URL || 'http://localhost:6000';
@@ -99,6 +100,7 @@ router.post('/retrain',
   try {
     const response = await axios.post(`${ML_URL}/retrain`, { target, retailer_id });
     res.json(response.data);
+    recordAudit(req, 'model.retrain', 'model', null, { target: target || 'all', retailer_id: retailer_id || null });
   } catch (err) {
     console.error('ML retrain error:', err.message);
     res.status(502).json({ error: 'Retrain failed: Model service unavailable' });

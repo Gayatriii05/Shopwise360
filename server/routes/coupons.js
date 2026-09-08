@@ -3,6 +3,7 @@ const { body, param } = require('express-validator');
 const pool = require('../config/db');
 const { authenticate, authorize } = require('../middleware/auth');
 const { handleValidation } = require('../utils/validate');
+const { recordAudit } = require('../services/auditLogger');
 
 const router = express.Router();
 
@@ -77,6 +78,7 @@ router.post('/', authenticate, authorize('admin'), couponFields, handleValidatio
        min_order_value, max_discount, active, valid_from, valid_to, usage_limit, retailer_id]
     );
     res.status(201).json({ id: result.insertId, code: code.toUpperCase() });
+    recordAudit(req, 'coupon.create', 'coupon', result.insertId, { code: code.toUpperCase() });
   } catch (err) {
     if (err.code === 'ER_DUP_ENTRY') return res.status(409).json({ error: 'Coupon code already exists' });
     console.error(err);
@@ -144,7 +146,9 @@ router.delete('/:id',
   handleValidation,
   async (req, res) => {
   try {
+    const [rows] = await pool.query('SELECT code FROM coupons WHERE id = ?', [req.params.id]);
     await pool.query('DELETE FROM coupons WHERE id = ?', [req.params.id]);
+    recordAudit(req, 'coupon.delete', 'coupon', req.params.id, { code: rows.length ? rows[0].code : null });
     res.json({ message: 'Coupon deleted' });
   } catch (err) {
     res.status(500).json({ error: 'Failed to delete coupon' });

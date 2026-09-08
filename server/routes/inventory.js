@@ -5,6 +5,7 @@ const { authenticate, authorize } = require('../middleware/auth');
 const { emitLowStockAlert } = require('../socket');
 const { handleValidation } = require('../utils/validate');
 const { invalidateRetailer } = require('../services/dashboardCache');
+const { sendLowStockAlert, dispatch } = require('../services/mailer');
 
 const router = express.Router();
 
@@ -81,6 +82,22 @@ router.put('/:id',
           emitLowStockAlert(inv.retailer_id, {
             inventory_id: req.params.id, alert_id: ins.insertId, quantity, threshold: low_stock_threshold, message: 'Stock low'
           });
+          // Best-effort email: low-stock alert to the retailer
+          dispatch((async () => {
+            const [[retailer]] = await pool.query(`
+              SELECT r.store_name, u.email
+              FROM retailers r JOIN users u ON r.user_id = u.id
+              WHERE r.id = ?`, [inv.retailer_id]);
+            if (!retailer) return null;
+            const [[prod]] = await pool.query('SELECT name FROM products WHERE id = (SELECT product_id FROM inventory WHERE id = ?)', [req.params.id]);
+            return sendLowStockAlert({
+              to: retailer.email,
+              storeName: retailer.store_name,
+              productName: prod ? prod.name : `Inventory #${req.params.id}`,
+              quantity,
+              threshold: low_stock_threshold
+            });
+          })());
         }
       } catch (_e) {}
     }

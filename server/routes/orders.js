@@ -6,6 +6,8 @@ const { emitNewOrder, emitOrderStatusChange, emitLowStockAlert, emitDashboardUpd
 const { resolveCoupon } = require('./coupons');
 const { handleValidation } = require('../utils/validate');
 const { invalidateRetailer } = require('../services/dashboardCache');
+const { sendOrderConfirmation, sendOrderStatusChange, dispatch } = require('../services/mailer');
+const { recordAudit } = require('../services/auditLogger');
 
 const router = express.Router();
 
@@ -134,6 +136,28 @@ router.post('/',
       }
     } catch (_e) { /* socket is best-effort */ }
 
+    // Best-effort email notification: order confirmation to the customer.
+    // Fire-and-forget — a slow/down mail relay must never affect the response.
+    try {
+      dispatch((async () => {
+        const [[customer]] = await pool.query('SELECT name, email FROM users WHERE id = ?', [req.user.id]);
+        const [[retailer]] = await pool.query('SELECT store_name FROM retailers WHERE id = ?', [retailer_id]);
+        const [orderLines] = await pool.query(
+          `SELECT p.name, oi.quantity, oi.unit_price AS price
+           FROM order_items oi JOIN products p ON oi.product_id = p.id
+           WHERE oi.order_id = ?`, [orderId]
+        );
+        return sendOrderConfirmation({
+          to: customer.email,
+          customerName: customer.name,
+          orderId,
+          total: finalTotal,
+          retailerName: retailer.store_name,
+          items: orderLines
+        });
+      })());
+    } catch (_e) { /* email is best-effort */ }
+
     await invalidateRetailer(retailer_id);
     res.status(201).json({ orderId, total: finalTotal, discount });
   } catch (err) {
@@ -230,6 +254,7 @@ router.put('/:id/status',
     }
 
     await pool.query('UPDATE orders SET status = ? WHERE id = ?', [status, req.params.id]);
+    recordAudit(req, 'order.status', 'order', req.params.id, { oldStatus: current, newStatus: status });
     // Emit real-time status change
     try {
       const [orderRows] = await pool.query('SELECT customer_id, retailer_id FROM orders WHERE id = ?', [req.params.id]);
@@ -238,6 +263,19 @@ router.put('/:id/status',
         emitOrderStatusChange(ord.customer_id, ord.retailer_id, req.params.id, status);
         emitDashboardUpdate(ord.retailer_id); // refresh retailer dashboard numbers
         await invalidateRetailer(ord.retailer_id);
+
+        // Best-effort email: status change notification to the customer
+        dispatch((async () => {
+          const [[customer]] = await pool.query('SELECT name, email FROM users WHERE id = ?', [ord.customer_id]);
+          if (!customer) return null;
+          return sendOrderStatusChange({
+            to: customer.email,
+            customerName: customer.name,
+            orderId: req.params.id,
+            newStatus: status,
+            oldStatus: current
+          });
+        })());
       }
     } catch (_e) {}
     res.json({ message: 'Order status updated', status });

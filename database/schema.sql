@@ -189,3 +189,18 @@ CREATE INDEX idx_sales_retailer_date ON sales_transactions(retailer_id, sold_at)
 CREATE INDEX idx_orders_customer ON orders(customer_id);
 CREATE INDEX idx_reviews_product ON reviews(product_id);
 CREATE INDEX idx_wishlists_customer ON wishlists(customer_id);
+
+CREATE TABLE audit_log (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  actor_id INT NOT NULL,
+  actor_role ENUM('customer','retailer','supplier','admin') NOT NULL,
+  action VARCHAR(50) NOT NULL,
+  entity_type VARCHAR(50) NOT NULL,
+  entity_id INT NULL,
+  details JSON NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (actor_id) REFERENCES users(id) ON DELETE CASCADE,
+  INDEX idx_audit_action (action),
+  INDEX idx_audit_entity (entity_type, entity_id),
+  INDEX idx_audit_created (created_at)
+);
