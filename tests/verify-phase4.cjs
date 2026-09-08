@@ -49,15 +49,19 @@ async function main() {
     `status=${badRate.status}`);
 
   // ---------- ITEM 2: rate limiting (burst on a throwaway email; isolated key) ----------
+  // Burst count derives from the configured limit so the check stays correct
+  // whatever AUTH_RATE_MAX is set to (dev .env bumps it for re-run convenience).
+  const authMax = parseInt(envValue('AUTH_RATE_MAX'), 10) || 20;
+  const burstTarget = authMax + 2;
   const burstEmail = `burst_${Date.now()}@example.com`;
   const codes = {};
-  for (let i = 0; i < 25; i++) {
+  for (let i = 0; i < burstTarget; i++) {
     const r = await api('post', '/auth/login', { data: { email: burstEmail, password: 'x' } });
     codes[r.status] = (codes[r.status] || 0) + 1;
     if (r.status === 429) break;
   }
   record('#ratelimit login 429 after burst',
-    codes[429] === 1 && codes[401] >= 20,
+    codes[429] === 1 && codes[401] >= authMax,
     JSON.stringify(codes));
 
   const realLogin = await api('post', '/auth/login', { data: { email: 'retailer@shopwise.com', password: PASSWORD } });

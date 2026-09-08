@@ -15,7 +15,9 @@ shopwise360/
 ├── client/          # React frontend (Vite)
 ├── server/          # Node/Express API
 ├── ml-service/      # Python Flask ML microservice
-└── database/        # SQL schema
+├── database/        # SQL schema
+├── tests/           # Jest + regression verification suites
+└── docker-compose.yml / render.yaml / vercel.json   # deployment
 ```
 
 ## Setup
@@ -65,27 +67,70 @@ Open http://localhost:3001
 > so the client dev server is configured for **3001**. Both the API base URL and the
 > socket URL point straight at `localhost:5000`, so nothing else needs to change.
 
+## Environment variables
+
+### Server (`server/.env`) — copy from `server/.env.example`
+| Variable | Default | Purpose |
+|---|---|---|
+| `PORT` | `5000` | API listen port |
+| `DB_HOST` | `localhost` | MySQL host |
+| `DB_USER` | `root` | MySQL user |
+| `DB_PASSWORD` | — | MySQL password (required) |
+| `DB_NAME` | `shopwise360` | MySQL database |
+| `JWT_SECRET` | — | Random long string signing access tokens (required) |
+| `ML_SERVICE_URL` | `http://127.0.0.1:6000` | Base URL of the ML microservice |
+| `ACCESS_TOKEN_TTL` | `15m` | Access-token lifetime (e.g. `15m`, `1h`) |
+| `REFRESH_TOKEN_TTL` | `7d` | Refresh-token lifetime |
+| `AUTH_RATE_MAX` | `20` | Max login attempts per IP+email per window |
+| `AUTH_RATE_WINDOW_MS` | `900000` | Rate-limit window (ms) for login |
+| `REGISTER_RATE_MAX` | `50` | Max registrations per IP per window |
+| `REGISTER_RATE_WINDOW_MS` | `3600000` | Rate-limit window (ms) for register |
+| `REDIS_URL` | `redis://localhost:6379` | Optional Redis for dashboard cache (app **fails open** to DB when unreachable) |
+| `DASH_CACHE_TTL` | `60` | Dashboard cache TTL in seconds |
+
+### ML service (`ml-service/.env`) — copy from `ml-service/.env.example`
+| Variable | Default | Purpose |
+|---|---|---|
+| `DB_HOST` | `localhost` | MySQL host |
+| `DB_USER` | `root` | MySQL user |
+| `DB_PASSWORD` | — | MySQL password (required) |
+| `DB_NAME` | `shopwise360` | MySQL database |
+| `ML_PORT` | `6000` | Flask listen port |
+| `MODEL_MAX_AGE_SECONDS` | `43200` (12h) | Persisted model freshness window (stale/missing → lazy retrain) |
+
+### Client (`client/.env`) — copy from `client/.env.example`
+| Variable | Default | Purpose |
+|---|---|---|
+| `VITE_API_URL` | `http://localhost:5000/api` | API base URL the frontend calls |
+| `VITE_SOCKET_URL` | `http://localhost:5000` | Socket.IO server URL for real-time alerts |
+
+## Tests
+- **API/Jest** (`tests/`): `npm run test:unit` — auth, transaction-safe orders, RBAC. Requires MySQL + the server running on `:5000`.
+- **SQL regressions** (`tests/`): `npm run verify:phase0`, `verify:phase3`, `verify:phase4`, plus `socket:e2e`.
+- **ML/pytest** (`ml-service/`): `pip install -r requirements-dev.txt && python -m pytest` — cold-start recommender + demand fallback unit tests (no DB/network needed).
+
 ## What's implemented
-- JWT auth + role-based access (customer/retailer/supplier/admin)
+- JWT auth + role-based access (customer/retailer/supplier/admin) with access + rotating refresh tokens
 - Full product CRUD, multi-table joined queries for inventory/sales
-- Order placement with transaction-safe inventory decrement + profit calc
+- Order placement with transaction-safe inventory decrement + profit calc (oversell → 409 + rollback)
 - Retailer dashboard: revenue/profit, top products, category breakdown, daily sales chart, low-stock alerts
-- Admin dashboard: platform-wide aggregates, per-retailer revenue, user counts
+- Admin dashboard: platform-wide aggregates, per-retailer revenue, user counts (Redis-cached, DB fallback)
 - Supplier dashboard: product performance, stock across retailers
-- Scikit-learn recommender (item-based collaborative filtering, cosine similarity)
-- Scikit-learn demand forecast (per-product linear regression on sales history)
+- Scikit-learn recommender (item-based collaborative filtering, cosine similarity, popularity cold-start fallback)
+- Scikit-learn demand forecast (per-product linear regression on sales history, avg fallback)
 - Hourly cron job auto-generating low-stock alerts
+- Validation (consistent `{ error, errors }` 400s), rate limiting (login/register), refresh-token rotation + reuse detection
+- Global error handler (malformed JSON → 400, multer → 400/413)
+- Docker Compose (MySQL + Redis + server + ML + client) + Dockerfiles + `.dockerignore`
+- Automation-style regression suites + Jest integration tests + pytest unit tests
 
 ## What's intentionally left for you to extend (with OpenCode)
 - Image upload for products (multer)
 - Payment integration (mock or Razorpay/Stripe)
 - Pagination, search & filters on product listing
-- Order status tracking UI for retailer
-- Better ML: real train/test split, model persistence with joblib, scheduled retraining
-- Redis caching for dashboard aggregate queries
-- Dockerize (compose file for mysql + server + ml-service + client)
-- Unit/integration tests
-- Deployment configs (Vercel for client, Render/Railway for server + ml-service)
+- Order status tracking UI for retailer (backend flow is tested)
+- Better ML: real train/test split, scheduled retraining via `/ml/retrain`, model drift monitoring
+- Real Redis + Docker deployment on a hosted provider (configs ship in `render.yaml` / `vercel.json` / Dockerfiles)
 
 ## API overview
 | Method | Route | Access |

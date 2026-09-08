@@ -6,12 +6,17 @@
     "verify:phase0": "node verify-phase0.cjs",
     "socket:e2e": "node socket-e2e.cjs",
     "verify:phase3": "node verify-phase3.cjs",
-    "verify:phase4": "node verify-phase4.cjs"
+    "verify:phase4": "node verify-phase4.cjs",
+    "test:unit": "jest --config jest.config.cjs"
   },
   "dependencies": {
     "axios": "^1.7.2",
     "ioredis": "^6.0.0",
     "jsonwebtoken": "^9.0.3",
     "socket.io-client": "^4.8.3"
+  },
+  "devDependencies": {
+    "jest": "^30.5.1",
+    "supertest": "^7.2.2"
   }
 }

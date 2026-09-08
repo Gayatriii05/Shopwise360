@@ -1,0 +1,94 @@
+# Render Blueprint — one-click deploy of all three services.
+#
+# Usage:
+#   1. Push this repo (with render.yaml at the root) to GitHub.
+#   2. On Render: New -> Blueprint -> select the repo. Render reads this file
+#      and scaffolds: server (Node), ml-service (Python), client (Static Site).
+#   3. Wire the Blueprint -> Environment variables as documented in
+#      server/.env.example and ml-service/.env.example, and set the
+#      SAME JWT_SECRET on all services that need it.
+#
+# MySQL is NOT provisioned by Render Blueprint. Provision one via
+# Render Managed PostgreSQL? No — this app uses MySQL. Options:
+#   * Render doesn't offer managed MySQL; use a free MySQL host (aiven,
+#     planet scale is MySQL refocus, etc.) or Railway's free MySQL, or a
+#     database Dockerfile service defined here.
+# We keep the DB as an external concern and document the env vars below.
+
+services:
+  # ---------- API SERVER ----------
+  - type: web
+    name: shopwise360-server
+    env: node
+    region: oregon
+    plan: free
+    buildCommand: npm ci --omit=dev
+    startCommand: node server.js
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 5000
+      - key: DB_HOST
+        sync: false
+      - key: DB_USER
+        sync: false
+      - key: DB_PASSWORD
+        sync: false
+      - key: DB_NAME
+        value: shopwise360
+      - key: JWT_SECRET
+        sync: false
+      - key: ML_SERVICE_URL
+        value: https://shopwise360-ml-service.onrender.com
+      - key: ACCESS_TOKEN_TTL
+        value: 15m
+      - key: REFRESH_TOKEN_TTL
+        value: 7d
+      - key: REDIS_URL
+        sync: false # optional: app fails open to DB when unreachable
+      - key: DASH_CACHE_TTL
+        value: 60
+
+  # ---------- ML SERVICE ----------
+  - type: web
+    name: shopwise360-ml-service
+    env: python
+    region: oregon
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: python app.py
+    healthCheckPath: /health
+    envVars:
+      - key: PYTHONUNBUFFERED
+        value: 1
+      - key: ML_PORT
+        value: 6000
+      - key: DB_HOST
+        sync: false
+      - key: DB_USER
+        sync: false
+      - key: DB_PASSWORD
+        sync: false
+      - key: DB_NAME
+        value: shopwise360
+
+  # ---------- REACT CLIENT (static) ----------
+  - type: web
+    name: shopwise360-client
+    env: static
+    buildCommand: npm ci && npm run build
+    staticPublishPath: ./dist
+    routes:
+      - type: rewrite
+        source: /api/*
+        destination: https://shopwise360-server.onrender.com/api/*
+      - type: rewrite
+        source: /socket.io/*
+        destination: https://shopwise360-server.onrender.com/socket.io/*
+    envVars:
+      - key: VITE_API_URL
+        value: https://shopwise360-server.onrender.com/api
+      - key: VITE_SOCKET_URL
+        value: https://shopwise360-server.onrender.com
