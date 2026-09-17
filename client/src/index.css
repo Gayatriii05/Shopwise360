@@ -1,0 +1,130 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    font-family: 'Plus Jakarta Sans', Inter, system-ui, -apple-system, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    scroll-behavior: smooth;
+    background-color: #ECE9F7;
+    color-scheme: light;
+  }
+
+  /* Editorial serif display hierarchy for page + section headlines */
+  h1 {
+    font-family: 'Fraunces', Georgia, Cambria, serif;
+    letter-spacing: -0.02em;
+  }
+
+  h2 {
+    font-family: 'Fraunces', Georgia, Cambria, serif;
+    letter-spacing: -0.014em;
+  }
+
+  body {
+    @apply bg-cream-100 text-cream-800 selection:bg-violet-200 selection:text-violet-900;
+    background-image: linear-gradient(180deg, rgba(246, 243, 253, 0.8), transparent 460px);
+    background-attachment: fixed;
+  }
+
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: #E1DDF0;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: linear-gradient(180deg, #B9A0F0, #8B6FD6);
+    border-radius: 9999px;
+    border: 2px solid #E1DDF0;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: #7A5CC4;
+  }
+
+  select option {
+    background-color: #F7F5FE;
+    color: #3C3553;
+  }
+}
+
+@layer components {
+  /* Paper surface — crisp 1px charcoal-lavender border, quiet shadow, NO glass/blur */
+  .glass-card {
+    background: #FCFBFE;
+    border: 1px solid #DED9EC;
+    box-shadow:
+      0 0 0 1px rgba(60, 53, 83, 0.03),
+      0 1px 2px rgba(60, 53, 83, 0.03),
+      0 6px 16px -6px rgba(60, 53, 83, 0.06);
+  }
+
+  /* Stronger paper surface for inputs / sticky bars */
+  .glass-strong {
+    background: #FCFBFE;
+    border: 1px solid #D5CFE7;
+    box-shadow:
+      0 0 0 1px rgba(60, 53, 83, 0.04),
+      0 4px 14px -8px rgba(60, 53, 83, 0.1);
+  }
+
+  /* Editorial flat accent (no gradient clipping) — kept class for compatibility */
+  .text-gradient {
+    color: #7A5CC4;
+  }
+
+  .text-gradient-warm {
+    color: #B25F42;
+  }
+
+  /* Uppercase overline micro-label (editorial data labels) */
+  .label-micro {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: #8F88A8;
+  }
+
+  .hairline {
+    border-color: #E7E3F4;
+  }
+
+  .shimmer-wave {
+    background: linear-gradient(90deg, rgba(122, 92, 196, 0.05) 0%, rgba(122, 92, 196, 0.11) 50%, rgba(122, 92, 196, 0.05) 100%);
+    background-size: 200% 100%;
+    animation: shimmer 1.9s infinite linear;
+  }
+
+  .bg-grid-faint {
+    background-image:
+      linear-gradient(rgba(122, 92, 196, 0.06) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(122, 92, 196, 0.06) 1px, transparent 1px);
+    background-size: 44px 44px;
+  }
+
+  .chart-tooltip {
+    @apply glass-strong rounded-xl text-xs font-medium;
+    padding: 0.55rem 0.75rem;
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+
+  .scrollbar-none {
+    scrollbar-width: none;
+  }
+
+  .scrollbar-none::-webkit-scrollbar {
+    display: none;
+  }
+}
