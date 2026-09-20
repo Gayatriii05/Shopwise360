@@ -65,7 +65,7 @@ export default function App() {
       <footer className="relative z-10 mt-16 border-t border-border">
         <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-4 px-4 py-8 sm:flex-row sm:px-6 lg:px-8">
           <div className="flex items-center gap-2.5">
-            <span className="grid size-7 place-items-center rounded-lg bg-gradient-to-br from-primary to-[#8b5cf6] text-[11px] font-black text-primary-foreground shadow-glow-brand">
+            <span className="grid size-7 place-items-center rounded-lg bg-gradient-to-br from-[#ff3d77] to-[#ff7a45] text-[11px] font-black text-primary-foreground shadow-glow-brand">
               S
             </span>
             <div>

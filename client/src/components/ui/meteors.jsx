@@ -21,7 +21,7 @@ export function Meteors({ number = 20, className = '' }) {
             className="animate-meteor absolute top-0"
             style={{ left: `${left}%`, animationDelay: `${delay}s`, animationDuration: duration }}
           >
-            <span className="block h-[2px] w-20 rounded-full bg-gradient-to-r from-violet-500 via-pink-400 to-orange-300 opacity-90" />
+            <span className="block h-[2px] w-20 rounded-full bg-gradient-to-r from-[#ff3d77] via-[#ff7a45] to-[#ffc145] opacity-90" />
           </span>
         );
       })}

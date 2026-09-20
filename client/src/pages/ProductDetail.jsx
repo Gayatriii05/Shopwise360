@@ -17,7 +17,7 @@ import { Progress } from '../components/ui/progress';
 import { Skeleton } from '../components/Skeleton';
 import { StoreIcon, ShieldIcon, CheckCircleIcon, AlertCircleIcon } from '../components/Icons';
 
-const imgFallback = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="600" height="450"%3E%3Crect width="100%25" height="100%25" fill="%23F5EFE6"/%3E%3Ctext x="50%25" y="50%25" fill="%239A8E80" font-size="16" font-family="sans-serif" font-weight="600" text-anchor="middle"%3ENo image available%3C/text%3E%3C/svg%3E';
+const imgFallback = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="600" height="450"%3E%3Crect width="100%25" height="100%25" fill="%23FFF3E6"/%3E%3Ctext x="50%25" y="50%25" fill="%239A8572" font-size="16" font-family="sans-serif" font-weight="600" text-anchor="middle"%3ENo image available%3C/text%3E%3C/svg%3E';
 
 export default function ProductDetail() {
   const { id } = useParams();

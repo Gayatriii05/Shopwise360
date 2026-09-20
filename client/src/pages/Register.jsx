@@ -45,7 +45,7 @@ export default function Register() {
         <Card className="gap-0 py-0 shadow-elevated ring-border/70">
           <CardContent className="p-8 sm:p-10">
             <div className="text-center mb-8">
-              <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-primary to-[#8b5cf6] mx-auto flex items-center justify-center text-primary-foreground shadow-glow-brand mb-3">
+              <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-[#ff3d77] to-[#ff7a45] mx-auto flex items-center justify-center text-primary-foreground shadow-glow-brand mb-3">
                 <LogoIcon className="w-6 h-6 text-white" />
               </div>
               <TextGenerateEffect words="Create an Account" className="text-2xl font-extrabold tracking-tight text-foreground" />

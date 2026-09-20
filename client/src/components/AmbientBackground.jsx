@@ -1,9 +1,9 @@
 export default function AmbientBackground() {
   return (
     <div aria-hidden="true" className="pointer-events-none fixed inset-0 -z-20 overflow-hidden">
-      <div className="absolute -top-[18%] -left-[10%] h-[52vw] w-[52vw] rounded-full bg-[radial-gradient(circle,rgba(139,92,246,0.20),transparent_65%)] blur-[40px] animate-drift" />
-      <div className="absolute -top-[10%] right-[-12%] h-[46vw] w-[46vw] rounded-full bg-[radial-gradient(circle,rgba(236,72,153,0.14),transparent_65%)] blur-[40px] animate-drift-slow" />
-      <div className="absolute bottom-[-22%] left-[22%] h-[48vw] w-[48vw] rounded-full bg-[radial-gradient(circle,rgba(249,115,22,0.12),transparent_65%)] blur-[50px] animate-drift" style={{ animationDelay: '-8s' }} />
+      <div className="absolute -top-[18%] -left-[10%] h-[52vw] w-[52vw] rounded-full bg-[radial-gradient(circle,rgba(255,61,119,0.18),transparent_65%)] blur-[40px] animate-drift" />
+      <div className="absolute -top-[10%] right-[-12%] h-[46vw] w-[46vw] rounded-full bg-[radial-gradient(circle,rgba(255,122,69,0.14),transparent_65%)] blur-[40px] animate-drift-slow" />
+      <div className="absolute bottom-[-22%] left-[22%] h-[48vw] w-[48vw] rounded-full bg-[radial-gradient(circle,rgba(255,193,69,0.12),transparent_65%)] blur-[50px] animate-drift" style={{ animationDelay: '-8s' }} />
 
       <div className="absolute inset-0 bg-grid opacity-[0.5] [mask-image:radial-gradient(ellipse_at_center,black_20%,transparent_78%)] animate-grid-pan" />
 

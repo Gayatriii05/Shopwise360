@@ -7,55 +7,49 @@ import {
 } from '@tremor/react';
 
 /* ---------------------------------------------------------------------------
-   ShopWise 360 — Tremor chart kit (violet → pink → orange, teal success)
+   ShopWise 360 — Tremor chart kit (hot pink → coral → amber, lime success)
    Every dashboard chart runs on Tremor chart components. The `colors` prop is
    always mapped to palette names so no blue/cyan ever renders.
 --------------------------------------------------------------------------- */
 
 const HEX_TO_NAME = {
-  '#8B5CF6': 'violet',
-  '#6366F1': 'violet',
-  '#A78BFA': 'violet',
-  '#7C3AED': 'violet',
-  '#EC4899': 'pink',
-  '#F472B6': 'pink',
-  '#DB2777': 'pink',
-  '#FB7185': 'pink',
-  '#F97316': 'orange',
-  '#EA580C': 'orange',
-  '#FB923C': 'orange',
-  '#F59E0B': 'amber',
-  '#FBBF24': 'amber',
-  '#F5B12B': 'amber',
-  '#10B981': 'emerald',
-  '#34D399': 'emerald',
-  '#059669': 'emerald',
-  '#14B8A6': 'teal',
-  '#0D9488': 'teal',
-  '#E879F9': 'fuchsia',
-  '#D946EF': 'fuchsia',
+  '#FF3D77': 'pink',
+  '#F31C62': 'pink',
+  '#FF6F9A': 'pink',
+  '#FF7A45': 'orange',
+  '#F45A1F': 'orange',
+  '#FF9768': 'orange',
+  '#FFC145': 'amber',
+  '#FFD534': 'amber',
+  '#E89B12': 'amber',
+  '#7ED957': 'emerald',
+  '#97DC4E': 'emerald',
+  '#5CBC32': 'emerald',
+  '#6C5CE7': 'violet',
+  '#5B4BE0': 'violet',
+  '#9488E3': 'violet',
 };
 
 /** Map any accent hex to a Tremor palette name; never allows blue. */
 export function toTremorColor(hex) {
-  return HEX_TO_NAME[String(hex || '').toUpperCase()] || 'violet';
+  return HEX_TO_NAME[String(hex || '').toUpperCase()] || 'pink';
 }
 
 export const AXIS = {
   stroke: 'none',
-  tick: { fontSize: 10, fill: '#9A8E80' },
+  tick: { fontSize: 10, fill: '#B5A38F' },
   axisLine: false,
   tickLine: false,
 };
 
-export const GRID = 'rgba(54, 42, 32, 0.08)';
+export const GRID = 'rgba(43, 27, 61, 0.08)';
 
-export const SERIES_COLORS = ['#8B5CF6', '#EC4899', '#F97316', '#14B8A6', '#F59E0B', '#E879F9'];
+export const SERIES_COLORS = ['#FF7A45', '#FF3D77', '#FFC145', '#7ED957', '#6C5CE7'];
 
 export function TrendAreaChart({
   data = [],
   xKey = 'date',
-  series = [{ key: 'revenue', label: 'Revenue', color: '#8B5CF6' }],
+  series = [{ key: 'revenue', label: 'Revenue', color: '#FF7A45' }],
   height = 280,
   valueFormatter,
   className = '',
@@ -83,7 +77,7 @@ export function TrendAreaChart({
 export function GradientBarChart({
   data = [],
   xKey,
-  series = [{ key: 'revenue', label: 'Revenue', color: '#8B5CF6' }],
+  series = [{ key: 'revenue', label: 'Revenue', color: '#FF7A45' }],
   height = 280,
   valueFormatter,
   className = '',
@@ -159,7 +153,7 @@ export function DonutBreakdown({
 export function SparkAreaChart({
   data = [],
   xKey = 'date',
-  series = [{ key: 'value', label: '', color: '#8B5CF6' }],
+  series = [{ key: 'value', label: '', color: '#FF7A45' }],
   valueFormatter,
   className = '',
 }) {
@@ -178,7 +172,7 @@ export function SparkAreaChart({
 export function RankBars({
   items = [],
   valueFormatter = (v) => Number(v).toLocaleString('en-IN'),
-  color = '#8B5CF6',
+  color = '#FF7A45',
   accentColors,
   className = '',
   emptyLabel = 'No data',

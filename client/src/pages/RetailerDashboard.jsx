@@ -134,12 +134,12 @@ export default function RetailerDashboard() {
       {/* Header Bar */}
       <FadeIn y={12}>
         <div className="relative overflow-hidden rounded-3xl border border-border bg-card p-5 shadow-card sm:p-6">
-          <div aria-hidden className="pointer-events-none absolute -right-16 -top-20 size-64 rounded-full bg-[radial-gradient(circle,rgba(236,72,153,0.16),transparent_65%)]" />
-          <div aria-hidden className="pointer-events-none absolute -bottom-24 left-1/4 size-64 rounded-full bg-[radial-gradient(circle,rgba(139,92,246,0.18),transparent_65%)]" />
+          <div aria-hidden className="pointer-events-none absolute -right-16 -top-20 size-64 rounded-full bg-[radial-gradient(circle,rgba(255,61,119,0.16),transparent_65%)]" />
+          <div aria-hidden className="pointer-events-none absolute -bottom-24 left-1/4 size-64 rounded-full bg-[radial-gradient(circle,rgba(255,122,69,0.18),transparent_65%)]" />
 
           <div className="relative flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div className="flex items-center gap-3.5">
-              <div className="grid size-12 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-primary via-[#ec4899] to-[#f97316] font-extrabold text-white shadow-glow-brand">
+              <div className="grid size-12 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-[#ff3d77] via-[#ff7a45] to-[#ffc145] font-extrabold text-white shadow-glow-brand">
                 <Store className="size-6" />
               </div>
               <div>
@@ -262,8 +262,8 @@ export default function RetailerDashboard() {
                 valueFormatter={inr}
                 height={300}
                 series={[
-                  { key: 'revenue', label: 'Revenue', color: '#8B5CF6' },
-                  { key: 'profit', label: 'Profit', color: '#F97316' },
+                  { key: 'revenue', label: 'Revenue', color: '#FF7A45' },
+                  { key: 'profit', label: 'Profit', color: '#FF3D77' },
                 ]}
               />
             )}
@@ -279,7 +279,7 @@ export default function RetailerDashboard() {
           >
             <GlowingStarsBackgroundCard className="p-4">
               <div className="flex h-full flex-col items-center justify-center">
-                <RadialGauge id="retStock" value={stockPct} size={172} stroke={13} from="#10B981" to="#14B8A6" track="#EDE3D5">
+                <RadialGauge id="retStock" value={stockPct} size={172} stroke={13} from="#7ED957" to="#7ED957" track="#FFE0C2">
                   <div className="text-center">
                     <div className="mono-num text-4xl font-black tabular-nums text-foreground">
                       <CountUp value={stockPct} />
@@ -342,7 +342,7 @@ export default function RetailerDashboard() {
               <RankBars
                 items={predictions.map((p) => ({ name: p.name, value: Number(p.predicted_demand || 0) }))}
                 valueFormatter={count}
-                color="#8B5CF6"
+                color="#FFC145"
                 className="mt-1"
               />
             )}
