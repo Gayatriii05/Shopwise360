@@ -8,7 +8,7 @@ import { cn } from '@/lib/utils';
 export function CardSpotlight({
   children,
   className = '',
-  spotlightColor = 'rgba(255, 61, 119, 0.14)',
+  spotlightColor = 'rgba(196, 181, 253, 0.14)',
 }) {
   const divRef = useRef(null);
   const [point, setPoint] = useState({ x: 0, y: 0 });

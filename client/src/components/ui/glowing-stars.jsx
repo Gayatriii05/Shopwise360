@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { cn } from '@/lib/utils';
 
-const STAR_COLORS = ['#ff3d77', '#ff7a45', '#ffc145', '#7ed957', '#6c5ce7'];
+const STAR_COLORS = ['#c4b5fd', '#a7d8b8', '#ffd6a5', '#c98da8', '#d8cff7'];
 
 /**
  * Glowing Stars — Aceternity UI (ui.aceternity.com/GlowingStarsBackgroundCard)
@@ -52,7 +52,7 @@ export function GlowingStarsBackgroundCard({ children, className = '' }) {
           const b = stars[j];
           const d = Math.hypot(a.x - b.x, a.y - b.y);
           if (d < 95) {
-            ctx.strokeStyle = `rgba(255, 61, 119, ${0.16 * (1 - d / 95)})`;
+            ctx.strokeStyle = `rgba(196, 181, 253, ${0.16 * (1 - d / 95)})`;
             ctx.lineWidth = 0.6;
             ctx.beginPath();
             ctx.moveTo(a.x, a.y);
@@ -99,7 +99,7 @@ export function GlowingStarsBackgroundCard({ children, className = '' }) {
       <div
         aria-hidden="true"
         className="pointer-events-none absolute inset-0"
-        style={{ background: 'radial-gradient(120% 90% at 85% 0%, rgba(255,61,119,0.22), transparent 55%), radial-gradient(120% 100% at 10% 100%, rgba(255,122,69,0.18), transparent 55%)' }}
+        style={{ background: 'radial-gradient(120% 90% at 85% 0%, rgba(196,181,253,0.22), transparent 55%), radial-gradient(120% 100% at 10% 100%, rgba(167,216,184,0.18), transparent 55%)' }}
       />
       <canvas ref={canvasRef} className="absolute inset-0 h-full w-full" />
       {children}

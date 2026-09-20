@@ -49,7 +49,7 @@ export default function Pagination({ page, totalPages, onPageChange }) {
               onClick={() => onPageChange(p)}
               className={`h-9 w-9 rounded-xl text-xs font-bold transition-all ${
                 isCurrent
-                  ? 'scale-105 bg-gradient-to-br from-[#ff3d77] to-[#ff7a45] text-primary-foreground shadow-glow-brand'
+                  ? 'scale-105 bg-gradient-to-br from-[#c4b5fd] to-[#a7d8b8] text-primary-foreground shadow-glow-brand'
                   : 'border border-border bg-card text-muted-foreground shadow-subtle hover:border-primary/40 hover:bg-muted hover:text-primary'
               }`}
               aria-current={isCurrent ? 'page' : undefined}

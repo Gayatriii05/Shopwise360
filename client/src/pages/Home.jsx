@@ -112,7 +112,7 @@ export default function Home() {
           <section className="relative overflow-hidden">
             <div aria-hidden className="pointer-events-none absolute -left-24 -top-28 size-80 rounded-full bg-primary/10 blur-3xl" />
             <div aria-hidden className="pointer-events-none absolute -right-20 top-6 size-72 rounded-full bg-orange-400/15 blur-3xl" />
-            <Spotlight className="-top-40 left-0 md:-top-20 md:left-60" fill="#FFC145" />
+            <Spotlight className="-top-40 left-0 md:-top-20 md:left-60" fill="#FFD6A5" />
 
           <Stagger className="relative z-10 px-6 py-12 sm:px-12 sm:py-16">
             <StaggerItem>
@@ -127,7 +127,7 @@ export default function Home() {
                 <SparklesCore
                   className="absolute inset-0 z-0 h-full w-full"
                   background="transparent"
-                  particleColor="#FFB38D"
+                  particleColor="#C8BAF5"
                   particleDensity={80}
                   minSize={0.6}
                   maxSize={1.4}

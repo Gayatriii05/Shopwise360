@@ -1,21 +1,28 @@
 import { useNavigate } from 'react-router-dom';
+import { motion } from 'framer-motion';
 import { Eye } from 'lucide-react';
 import { ShoppingBag } from 'lucide-react';
 import { Stars } from './StarRating';
-import { WobbleCard } from './ui/wobble-card';
 import { Card, CardContent, CardFooter } from './ui/card';
 import { Badge } from './ui/badge';
 import { Button } from './ui/button';
 
-const imgFallback = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="400" height="300"%3E%3Crect width="100%25" height="100%25" fill="%23FFF3E6"/%3E%3Ctext x="50%25" y="50%25" fill="%239A8572" font-size="14" font-family="sans-serif" font-weight="600" text-anchor="middle"%3ENo image available%3C/text%3E%3C/svg%3E';
+const imgFallback = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="400" height="300"%3E%3Crect width="100%25" height="100%25" fill="%23F3EFE7"/%3E%3Ctext x="50%25" y="50%25" fill="%23A89D8E" font-size="14" font-family="sans-serif" font-weight="600" text-anchor="middle"%3ENo image available%3C/text%3E%3C/svg%3E';
 
 export default function ProductCard({ product, footer, onQuickView }) {
   const navigate = useNavigate();
   const go = () => navigate(`/product/${product.id}`);
 
   return (
-    <WobbleCard containerClassName="h-full group" maxTilt={7} className="h-full">
-      <Card className="group relative h-full gap-0 overflow-hidden rounded-2xl border-border py-0 shadow-card ring-border transition-[box-shadow,ring-color] duration-300 hover:shadow-[0_22px_48px_-22px_rgba(139,92,246,0.35)] hover:ring-primary/45">
+    <motion.div
+      className="h-full"
+      initial={{ opacity: 0, y: 16 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true, margin: '-40px' }}
+      transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
+      whileHover={{ y: -4 }}
+    >
+      <Card className="group relative h-full gap-0 overflow-hidden rounded-2xl border-border py-0 shadow-card ring-border transition-[box-shadow,ring-color] duration-300 hover:shadow-[0_22px_48px_-22px_rgba(196,181,253,0.4)] hover:ring-primary/45">
         {/* Clickable image with hover-zoom */}
         <div
           onClick={go}
@@ -97,6 +104,6 @@ export default function ProductCard({ product, footer, onQuickView }) {
         {/* Optional action / footer slot */}
         {footer && <CardFooter className="px-4">{footer}</CardFooter>}
       </Card>
-    </WobbleCard>
+    </motion.div>
   );
 }

@@ -6,14 +6,14 @@ import { CardSpotlight } from './ui/card-spotlight';
 import { EASE } from '../lib/motion';
 
 const ACCENTS = {
-    primary: { chip: 'from-pink-500/20 to-orange-400/5 text-pink-600 ring-pink-400/30', glow: 'bg-pink-500/12', line: '#FF7A45', spot: 'rgba(255, 122, 69, 0.14)' },
-    pink: { chip: 'from-pink-500/20 to-fuchsia-400/5 text-pink-600 ring-pink-400/30', glow: 'bg-pink-500/12', line: '#FF3D77', spot: 'rgba(255, 61, 119, 0.14)' },
-    cyan: { chip: 'from-amber-500/20 to-orange-400/5 text-amber-600 ring-amber-400/30', glow: 'bg-amber-500/12', line: '#FFC145', spot: 'rgba(255, 193, 69, 0.14)' },
-    emerald: { chip: 'from-emerald-500/20 to-teal-400/5 text-emerald-600 ring-emerald-400/30', glow: 'bg-emerald-500/12', line: '#7ED957', spot: 'rgba(126, 217, 87, 0.14)' },
-    amber: { chip: 'from-amber-500/20 to-orange-400/5 text-amber-600 ring-amber-400/30', glow: 'bg-amber-500/12', line: '#FFC145', spot: 'rgba(255, 193, 69, 0.14)' },
-    coral: { chip: 'from-orange-500/20 to-pink-400/5 text-orange-600 ring-orange-400/30', glow: 'bg-orange-500/12', line: '#FF7A45', spot: 'rgba(255, 122, 69, 0.14)' },
-    orange: { chip: 'from-orange-500/20 to-pink-400/5 text-orange-600 ring-orange-400/30', glow: 'bg-orange-500/12', line: '#FF7A45', spot: 'rgba(255, 122, 69, 0.14)' },
-    violet: { chip: 'from-violet-500/20 to-fuchsia-400/5 text-violet-600 ring-violet-400/30', glow: 'bg-violet-500/12', line: '#6C5CE7', spot: 'rgba(108, 92, 231, 0.14)' },
+    primary: { chip: 'from-violet-500/20 to-emerald-400/5 text-violet-700 ring-violet-400/30', glow: 'bg-violet-500/12', line: '#C4B5FD', spot: 'rgba(196, 181, 253, 0.16)' },
+    pink: { chip: 'from-pink-500/20 to-orange-400/5 text-pink-700 ring-pink-400/30', glow: 'bg-pink-500/12', line: '#C98DA8', spot: 'rgba(201, 141, 168, 0.16)' },
+    cyan: { chip: 'from-emerald-500/20 to-teal-400/5 text-emerald-700 ring-emerald-400/30', glow: 'bg-emerald-500/12', line: '#A7D8B8', spot: 'rgba(167, 216, 184, 0.16)' },
+    emerald: { chip: 'from-emerald-500/20 to-teal-400/5 text-emerald-700 ring-emerald-400/30', glow: 'bg-emerald-500/12', line: '#A7D8B8', spot: 'rgba(167, 216, 184, 0.16)' },
+    amber: { chip: 'from-orange-500/20 to-amber-400/5 text-orange-700 ring-orange-400/30', glow: 'bg-orange-500/12', line: '#FFD6A5', spot: 'rgba(255, 214, 165, 0.16)' },
+    coral: { chip: 'from-orange-500/20 to-amber-400/5 text-orange-700 ring-orange-400/30', glow: 'bg-orange-500/12', line: '#FFD6A5', spot: 'rgba(255, 214, 165, 0.16)' },
+    orange: { chip: 'from-orange-500/20 to-amber-400/5 text-orange-700 ring-orange-400/30', glow: 'bg-orange-500/12', line: '#FFD6A5', spot: 'rgba(255, 214, 165, 0.16)' },
+    violet: { chip: 'from-violet-500/20 to-fuchsia-400/5 text-violet-700 ring-violet-400/30', glow: 'bg-violet-500/12', line: '#C4B5FD', spot: 'rgba(196, 181, 253, 0.16)' },
   };
 
 export default function StatCard({

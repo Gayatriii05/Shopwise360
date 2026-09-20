@@ -44,7 +44,7 @@ export function WobbleCard({
         aria-hidden="true"
         className="pointer-events-none absolute inset-0 rounded-3xl opacity-0 blur-2xl transition-opacity duration-500 group-hover:opacity-100"
         style={{
-          background: 'linear-gradient(135deg, rgba(139,92,246,0.35), rgba(236,72,153,0.3), rgba(249,115,22,0.28))',
+          background: 'linear-gradient(135deg, rgba(196,181,253,0.35), rgba(167,216,184,0.3), rgba(255,214,165,0.28))',
           transform: 'translateY(6px) scale(0.96)',
         }}
       />

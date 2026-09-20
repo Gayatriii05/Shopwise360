@@ -34,7 +34,7 @@ export default function Navbar() {
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="flex h-16 items-center justify-between">
           <Link to="/" className="group flex items-center gap-2.5">
-            <div className="relative grid size-9 place-items-center rounded-xl bg-gradient-to-br from-[#ff3d77] via-[#ff7a45] to-[#ffc145] text-primary-foreground shadow-glow-brand transition-transform duration-300 group-hover:-translate-y-0.5 group-hover:rotate-3">
+            <div className="relative grid size-9 place-items-center rounded-xl bg-gradient-to-br from-[#c4b5fd] via-[#a7d8b8] to-[#ffd6a5] text-primary-foreground shadow-glow-brand transition-transform duration-300 group-hover:-translate-y-0.5 group-hover:rotate-3">
               <LogoIcon className="size-5" />
               <span className="absolute inset-0 rounded-xl ring-1 ring-inset ring-white/20" />
             </div>

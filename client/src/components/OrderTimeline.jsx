@@ -61,7 +61,7 @@ export default function OrderTimeline({ status }) {
                   transition={{ delay: i * 0.08, duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
                   className={`grid size-7 place-items-center rounded-full transition-all sm:size-8 ${
                     isCurrent
-                      ? 'bg-gradient-to-br from-[#ff3d77] to-[#ff7a45] text-white shadow-glow-brand ring-4 ring-primary/20'
+                      ? 'bg-gradient-to-br from-[#c4b5fd] to-[#a7d8b8] text-[#362F2A] shadow-glow-brand ring-4 ring-primary/20'
                       : isDone
                       ? 'border border-emerald-400/40 bg-emerald-500/15 text-emerald-700'
                       : 'border border-border bg-muted text-muted-foreground'

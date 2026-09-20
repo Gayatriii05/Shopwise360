@@ -198,10 +198,10 @@ export default function AdminDashboard() {
       {/* Header Bar */}
       <FadeIn y={12}>
         <Card className="relative gap-0 overflow-hidden p-5 sm:p-6">
-          <div aria-hidden className="pointer-events-none absolute -right-16 -top-24 size-64 rounded-full bg-[radial-gradient(circle,rgba(255,61,119,0.18),transparent_65%)]" />
+          <div aria-hidden className="pointer-events-none absolute -right-16 -top-24 size-64 rounded-full bg-[radial-gradient(circle,rgba(196,181,253,0.18),transparent_65%)]" />
           <div className="relative flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-center gap-3.5">
-              <div className="grid size-12 place-items-center rounded-2xl bg-gradient-to-br from-[#ff3d77] via-[#ff7a45] to-[#ffc145] font-extrabold text-white shadow-glow-brand">
+              <div className="grid size-12 place-items-center rounded-2xl bg-gradient-to-br from-[#c4b5fd] via-[#a7d8b8] to-[#ffd6a5] font-extrabold text-[#362F2A] shadow-glow-brand">
                 <Shield className="size-6" />
               </div>
               <div>
@@ -270,7 +270,7 @@ export default function AdminDashboard() {
                 xKey="store_name"
                 valueFormatter={inr}
                 height={264}
-                series={[{ key: 'revenue', label: 'Store Revenue (₹)', color: '#FF7A45' }]}
+                series={[{ key: 'revenue', label: 'Store Revenue (₹)', color: '#C4B5FD' }]}
               />
             )}
           </ChartCard>
@@ -463,7 +463,7 @@ export default function AdminDashboard() {
 
           {coupons.length > 0 && (
             <div className="flex flex-wrap items-center gap-5 rounded-2xl border border-border bg-muted/30 p-4">
-              <RadialGauge id="couponUse" value={couponUsage} size={120} stroke={11} from="#FFC145" to="#FF3D77" track="#FFE0C2" glow={false}>
+              <RadialGauge id="couponUse" value={couponUsage} size={120} stroke={11} from="#FFD6A5" to="#A7D8B8" track="#E5DFD3" glow={false}>
                 <div className="text-center">
                   <div className="mono-num text-2xl font-black tabular-nums text-foreground">
                     <CountUp value={couponUsage} />
@@ -635,7 +635,7 @@ function ModelHealth({ health }) {
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center gap-5 rounded-2xl border border-border bg-muted/30 p-4">
-        <RadialGauge id="modelFresh" value={freshPct} size={120} stroke={11} from="#7ED957" to="#7ED957" track="#FFE0C2">
+        <RadialGauge id="modelFresh" value={freshPct} size={120} stroke={11} from="#A7D8B8" to="#A7D8B8" track="#E5DFD3">
           <div className="text-center">
             <div className="mono-num text-2xl font-black tabular-nums text-foreground">
               <CountUp value={freshPct} />

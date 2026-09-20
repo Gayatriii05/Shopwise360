@@ -6,7 +6,7 @@ export function LogoIcon({ className = "w-6 h-6" }) {
       <path d="M3 3h2l.4 2M7 13h10l3-8H6.4M7 13L5.4 5M7 13l-2 9m12-9l2 9m-11 0h10" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
       <circle cx="9" cy="20" r="1" fill="currentColor"/>
       <circle cx="17" cy="20" r="1" fill="currentColor"/>
-      <path d="M16 2l1 2 2 1-2 1-1 2-1-2-2-1 2-1 1-2z" fill="#FF3D77"/>
+      <path d="M16 2l1 2 2 1-2 1-1 2-1-2-2-1 2-1 1-2z" fill="#C4B5FD"/>
     </svg>
   );
 }

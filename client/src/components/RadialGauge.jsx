@@ -5,9 +5,9 @@ export default function RadialGauge({
   value = 0,
   size = 190,
   stroke = 14,
-  from = '#FF3D77',
-  to = '#FF7A45',
-  track = '#FFE0C2',
+  from = '#A7D8B8',
+  to = '#C4B5FD',
+  track = '#E5DFD3',
   glow = true,
   children,
 }) {
