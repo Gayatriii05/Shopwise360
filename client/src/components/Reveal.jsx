@@ -1,12 +1,19 @@
 import { motion } from 'framer-motion';
-import { EASE, pageTransition } from '../lib/motion';
+import {
+  EASE,
+  pageTransition,
+  staggerContainer,
+  staggerItem,
+  viewportOnce,
+} from '../lib/motion';
 
-export function FadeIn({ children, delay = 0, y = 18, className, ...rest }) {
+export function FadeIn({ children, delay = 0, y = 18, once = true, className, ...rest }) {
   return (
     <motion.div
       className={className}
       initial={{ opacity: 0, y }}
-      animate={{ opacity: 1, y: 0 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={once ? viewportOnce : { amount: 0.2 }}
       transition={{ duration: 0.55, delay, ease: EASE }}
       {...rest}
     >
@@ -15,19 +22,31 @@ export function FadeIn({ children, delay = 0, y = 18, className, ...rest }) {
   );
 }
 
-const staggerContainer = {
-  hidden: {},
-  show: { transition: { staggerChildren: 0.08, delayChildren: 0.05 } },
-};
-
-const staggerItem = {
-  hidden: { opacity: 0, y: 22 },
-  show: { opacity: 1, y: 0, transition: { duration: 0.5, ease: EASE } },
-};
-
-export function Stagger({ children, className, ...rest }) {
+export function ScaleIn({ children, delay = 0, className, ...rest }) {
   return (
-    <motion.div className={className} variants={staggerContainer} initial="hidden" animate="show" {...rest}>
+    <motion.div
+      className={className}
+      initial={{ opacity: 0, scale: 0.95 }}
+      whileInView={{ opacity: 1, scale: 1 }}
+      viewport={viewportOnce}
+      transition={{ duration: 0.5, delay, ease: EASE }}
+      {...rest}
+    >
+      {children}
+    </motion.div>
+  );
+}
+
+export function Stagger({ children, className, delay = 0, stagger = 0.08, ...rest }) {
+  return (
+    <motion.div
+      className={className}
+      variants={staggerContainer(stagger, delay)}
+      initial="hidden"
+      whileInView="show"
+      viewport={viewportOnce}
+      {...rest}
+    >
       {children}
     </motion.div>
   );

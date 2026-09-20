@@ -50,23 +50,27 @@ async function seed() {
     } else retailerId = retRows[0].id;
 
     console.log('Seeding products...');
+    const imgs = (id) => `https://images.unsplash.com/${id}?w=600&q=80&auto=format&fit=crop`;
     const products = [
-      ['Wireless Mouse', 'Ergonomic 2.4GHz wireless mouse', 1, 300, 599],
-      ['Bluetooth Speaker', 'Portable 10W speaker', 1, 800, 1499],
-      ['Basmati Rice 5kg', 'Premium long-grain rice', 2, 400, 549],
-      ['Cotton T-Shirt', 'Unisex round neck tee', 3, 150, 399],
-      ['Non-stick Pan', '26cm induction-friendly pan', 4, 350, 699],
-      ['Face Wash 100ml', 'Herbal daily face wash', 5, 90, 199],
-      ['Mechanical Keyboard', 'RGB backlit mechanical keyboard', 1, 1200, 2199],
-      ['LED Desk Lamp', 'Adjustable brightness lamp', 4, 250, 499],
+      ['Wireless Mouse', 'Ergonomic 2.4GHz wireless mouse', 1, 300, 599, imgs('photo-1527864550417-7fd91fc51a46')],
+      ['Bluetooth Speaker', 'Portable 10W speaker', 1, 800, 1499, imgs('photo-1608043152269-423dbba4e7e1')],
+      ['Basmati Rice 5kg', 'Premium long-grain rice', 2, 400, 549, imgs('photo-1586201375761-83865001e31c')],
+      ['Cotton T-Shirt', 'Unisex round neck tee', 3, 150, 399, imgs('photo-1576566588028-4147f3842f27')],
+      ['Non-stick Pan', '26cm induction-friendly pan', 4, 350, 699, imgs('photo-1519751138087-5bf79df62d5b')],
+      ['Face Wash 100ml', 'Herbal daily face wash', 5, 90, 199, imgs('photo-1556228578-8c89e6adf883')],
+      ['Mechanical Keyboard', 'RGB backlit mechanical keyboard', 1, 1200, 2199, imgs('photo-1587829741301-dc798b83add3')],
+      ['LED Desk Lamp', 'Adjustable brightness lamp', 4, 250, 499, imgs('photo-1507473885765-e6ed057f782c')],
     ];
     const productIds = [];
-    for (const [name, desc, catId, cost, sale] of products) {
+    for (const [name, desc, catId, cost, sale, imageUrl] of products) {
       const [existing] = await conn.query('SELECT id FROM products WHERE name = ?', [name]);
-      if (existing.length) { productIds.push(existing[0].id); continue; }
+      if (existing.length) {
+        await conn.query('UPDATE products SET image_url = ? WHERE id = ?', [imageUrl, existing[0].id]);
+        productIds.push(existing[0].id); continue;
+      }
       const [r] = await conn.query(
-        'INSERT INTO products (name, description, category_id, supplier_id, cost_price, sale_price) VALUES (?, ?, ?, ?, ?, ?)',
-        [name, desc, catId, supplierId, cost, sale]
+        'INSERT INTO products (name, description, category_id, supplier_id, cost_price, sale_price, image_url) VALUES (?, ?, ?, ?, ?, ?, ?)',
+        [name, desc, catId, supplierId, cost, sale, imageUrl]
       );
       productIds.push(r.insertId);
     }

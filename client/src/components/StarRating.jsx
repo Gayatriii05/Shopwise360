@@ -8,7 +8,7 @@ export function Stars({ rating = 0, size = 'text-sm' }) {
 
   return (
     <div className={`inline-flex items-center gap-1 ${size}`}>
-      <div className="flex items-center text-amber-400">
+      <div className="flex items-center text-amber-500">
         {[0, 1, 2, 3, 4].map((i) => {
           const isFull = i < full;
           const isHalf = i === full && half;
@@ -20,21 +20,21 @@ export function Stars({ rating = 0, size = 'text-sm' }) {
               fill="currentColor"
             >
               {isFull ? (
-                <path fill="#DDB24F" d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                <path fill="#F59E0B" d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
               ) : isHalf ? (
                 <g>
-                  <path fill="#D0CAE4" d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                  <path fill="#DDB24F" d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0V2.927z" />
+                  <path fill="#EADDC9" d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                  <path fill="#F59E0B" d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0V2.927z" />
                 </g>
               ) : (
-                <path fill="#D0CAE4" d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                <path fill="#EADDC9" d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
               )}
             </svg>
           );
         })}
       </div>
       {rating > 0 && (
-        <span className="text-xs font-semibold text-cream-600 ml-0.5 tracking-tight">
+        <span className="ml-0.5 text-xs font-semibold tracking-tight text-muted-foreground">
           {Number(rating).toFixed(1)}
         </span>
       )}
@@ -48,7 +48,7 @@ export function StarInput({ value = 0, onChange }) {
   const active = hover || value;
 
   return (
-    <div className="inline-flex items-center gap-1 bg-cream-100 p-1.5 rounded-xl border border-cream-300/70">
+    <div className="inline-flex items-center gap-1 rounded-xl border border-border bg-muted/60 p-1.5">
       {[1, 2, 3, 4, 5].map((n) => (
         <button
           key={n}
@@ -56,12 +56,12 @@ export function StarInput({ value = 0, onChange }) {
           onClick={() => onChange(n)}
           onMouseEnter={() => setHover(n)}
           onMouseLeave={() => setHover(0)}
-          className="p-1 rounded-lg hover:bg-cream-50 transition-all transform hover:scale-110 hover:-translate-y-0.5 focus:outline-none focus:ring-2 focus:ring-amber-400/80"
+          className="rounded-lg p-1 transition-all transform hover:scale-110 hover:-translate-y-0.5 focus:outline-none focus:ring-2 focus:ring-amber-500/80"
           aria-label={`Rate ${n} star${n > 1 ? 's' : ''}`}
         >
           <svg
             className={`w-6 h-6 transition-colors ${
-              n <= active ? 'text-amber-400 fill-amber-400' : 'text-cream-300 fill-cream-300'
+              n <= active ? 'text-amber-500 fill-amber-500' : 'text-muted fill-muted'
             }`}
             viewBox="0 0 20 20"
           >
@@ -69,7 +69,7 @@ export function StarInput({ value = 0, onChange }) {
           </svg>
         </button>
       ))}
-      <span className="text-xs font-semibold text-cream-500 ml-2 mr-1">
+      <span className="ml-2 mr-1 text-xs font-semibold text-muted-foreground">
         {active > 0 ? `${active} of 5` : 'Select rating'}
       </span>
     </div>

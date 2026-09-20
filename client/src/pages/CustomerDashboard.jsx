@@ -1,25 +1,57 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
+import { motion } from 'framer-motion';
 import { Link } from 'react-router-dom';
+import { EASE } from '../lib/motion';
 import api from '../api/client';
 import { useAuth } from '../context/AuthContext';
 import ProductCard from '../components/ProductCard';
+import ProductQuickView from '../components/ProductQuickView';
 import OrderTimeline, { StatusBadge } from '../components/OrderTimeline';
 import EmptyState from '../components/EmptyState';
 import { SkeletonCard } from '../components/Skeleton';
 import { Stagger, StaggerItem, FadeIn } from '../components/Reveal';
+import { TextGenerateEffect } from '../components/ui/text-generate-effect';
+import { GlowingStarsBackgroundCard, GlowingStarsTitle, GlowingStarsDescription } from '../components/ui/glowing-stars';
 import { useRealtime } from '../context/RealtimeContext';
-import { ShoppingBagIcon, PackageIcon, HeartIcon, SparklesIcon, StoreIcon, ShoppingCartIcon, TagIcon, CheckCircleIcon, AlertCircleIcon, XIcon, ArrowRightIcon } from '../components/Icons';
+import {
+  Search, SlidersHorizontal, RotateCcw, Minus, Plus, X, Trash2,
+  Sparkles, ShoppingBag, ShoppingCart, Store, Package, Heart,
+  CheckCircle2, AlertCircle, ArrowRight, Tag,
+} from 'lucide-react';
+import { Button } from '../components/ui/button';
+import { Badge } from '../components/ui/badge';
+import { Card } from '../components/ui/card';
+import { Input } from '../components/ui/input';
+import { Label } from '../components/ui/label';
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from '../components/ui/select';
+
+const fmtINR = (n) => Number(n).toLocaleString('en-IN', { maximumFractionDigits: 2 });
+
+const SORT_OPTIONS = [
+  { value: 'newest', label: 'Newest arrivals' },
+  { value: 'price_asc', label: 'Price: Low to High' },
+  { value: 'price_desc', label: 'Price: High to Low' },
+  { value: 'rating', label: 'Top rated' },
+];
+
+const DEFAULT_FILTERS = { search: '', category: '', sort: 'newest', min: '', max: '' };
 
 export default function CustomerDashboard() {
   const { user } = useAuth();
   const { on, connected } = useRealtime();
   const [products, setProducts] = useState([]);
+  const [knownProducts, setKnownProducts] = useState({}); // { id: product } for cart lookup
+  const [categories, setCategories] = useState([]);
   const [orders, setOrders] = useState([]);
   const [recommendations, setRecommendations] = useState([]);
   const [wishlist, setWishlist] = useState([]);
   const [retailers, setRetailers] = useState([]);
   const [retailerId, setRetailerId] = useState('');
   const [cart, setCart] = useState({}); // { product_id: qty }
+  const [filters, setFilters] = useState(DEFAULT_FILTERS);
+  const [quickView, setQuickView] = useState(null);
   const [couponInput, setCouponInput] = useState('');
   const [appliedCoupon, setAppliedCoupon] = useState(null);
   const [couponErr, setCouponErr] = useState('');
@@ -28,33 +60,63 @@ export default function CustomerDashboard() {
   const [activeTab, setActiveTab] = useState('shop');
   const [orderMsg, setOrderMsg] = useState('');
 
-  const loadOrders = () => api.get(`/orders/customer/${user.id}`).then(({ data }) => setOrders(data));
+  const loadOrders = async () => {
+    try {
+      const { data } = await api.get(`/orders/customer/${user.id}`);
+      return data;
+    } catch {
+      return [];
+    }
+  };
+
+  const mergeProducts = (list) => {
+    setProducts(list || []);
+    setKnownProducts((prev) => {
+      const next = { ...prev };
+      (list || []).forEach((p) => { next[p.id] = p; });
+      return next;
+    });
+  };
+
+  const loadProducts = async () => {
+    const params = { limit: 12 };
+    if (filters.search.trim()) params.search = filters.search.trim();
+    if (filters.category) params.category_id = filters.category;
+    if (filters.sort !== 'newest') params.sort = filters.sort;
+    if (filters.min !== '') params.min_price = Number(filters.min);
+    if (filters.max !== '') params.max_price = Number(filters.max);
+    try {
+      const { data } = await api.get('/products', { params });
+      mergeProducts(data.products);
+    } catch {
+      mergeProducts([]);
+    }
+  };
 
   const loadAll = async () => {
     setLoading(true);
+    setOrderMsg('');
+    const [p, o, w, r] = await Promise.allSettled([
+      api.get('/products', { params: { limit: 12 } }),
+      loadOrders(),
+      api.get('/wishlist/mine'),
+      api.get('/retailers')
+    ]);
+    mergeProducts(p.status === 'fulfilled' ? p.value.data.products : []);
+    setOrders(o.status === 'fulfilled' ? o.value : []);
+    setWishlist(w.status === 'fulfilled' ? w.value.data : []);
+    setRetailers(r.status === 'fulfilled' ? r.value.data : []);
+    if (!retailerId && r.status === 'fulfilled' && r.value.data.length) setRetailerId(r.value.data[0].id);
     try {
-      const [p, o, w, r] = await Promise.all([
-        api.get('/products', { params: { limit: 12 } }),
-        loadOrders(),
-        api.get('/wishlist/mine'),
-        api.get('/retailers')
-      ]);
-      setProducts(p.data.products);
-      setOrders(o.data);
-      setWishlist(w.data);
-      setRetailers(r.data);
-      if (!retailerId && r.data.length) setRetailerId(r.data[0].id);
-      try {
-        const rec = await api.get(`/ml/recommend/${user.id}`);
-        setRecommendations(rec.data);
-      } catch {
-        setRecommendations([]);
-      }
-    } catch (err) {
-      setOrderMsg(err.response?.data?.error || 'Failed to load dashboard data');
-    } finally {
-      setLoading(false);
+      const rec = await api.get(`/ml/recommend/${user.id}`);
+      setRecommendations(rec.data);
+    } catch {
+      setRecommendations([]);
     }
+    api.get('/products/categories').then(({ data }) => setCategories(data)).catch(() => {});
+    const failed = [p, o, w, r].filter((x) => x.status === 'rejected').length;
+    if (failed) setOrderMsg(`Partially loaded — ${failed} section${failed > 1 ? 's' : ''} unavailable right now`);
+    setLoading(false);
   };
 
   useEffect(() => { loadAll(); }, []);
@@ -68,10 +130,35 @@ export default function CustomerDashboard() {
     return unsub;
   }, [on]);
 
+  const refreshProducts = async () => {
+    setLoading(true);
+    await loadProducts();
+    setLoading(false);
+  };
+
+  const setFilter = (key, value) => setFilters((f) => ({ ...f, [key]: value }));
+
+  const applyFilters = (e) => {
+    if (e) e.preventDefault();
+    refreshProducts();
+  };
+
+  const resetFilters = () => {
+    setFilters(DEFAULT_FILTERS);
+    refreshProducts();
+  };
+
   const addToCart = (id) => setCart((c) => ({ ...c, [id]: (c[id] || 0) + 1 }));
   const removeFromCart = (id) => setCart((c) => {
     const next = { ...c };
     delete next[id];
+    return next;
+  });
+  const decCart = (id) => setCart((c) => {
+    const qty = (c[id] || 0) - 1;
+    const next = { ...c };
+    if (qty <= 0) delete next[id];
+    else next[id] = qty;
     return next;
   });
 
@@ -84,6 +171,8 @@ export default function CustomerDashboard() {
       } else {
         await api.post('/wishlist', { product_id: pid });
         setWishlist((w) => [...w, { product_id: pid }]);
+        const p = knownProducts[pid];
+        if (p) setWishlist((w) => w.map((x) => (x.product_id === pid ? p : x)));
       }
     } catch (err) {
       setOrderMsg(err.response?.data?.error || 'Wishlist update failed');
@@ -130,45 +219,52 @@ export default function CustomerDashboard() {
   };
 
   const cartCount = Object.values(cart).reduce((a, b) => a + b, 0);
-  const cartTotal = Object.entries(cart).reduce((sum, [id, qty]) => {
-    const p = products.find((x) => x.id === Number(id));
-    return sum + (p ? p.sale_price * qty : 0);
-  }, 0);
+  const cartItems = useMemo(() =>
+    Object.entries(cart)
+      .map(([id, qty]) => ({ product: knownProducts[id], qty }))
+      .filter((x) => x.product),
+  [cart, knownProducts]);
+  const cartTotal = cartItems.reduce((sum, { product, qty }) => sum + product.sale_price * qty, 0);
+  const cartFinalTotal = Math.max(0, cartTotal - (appliedCoupon?.discount || 0));
 
   const selectedStore = retailers.find((r) => r.id === retailerId);
+  const addQuickView = (p) => { setQuickView(p); };
 
   return (
-    <div className="space-y-8 pb-16">
+    <div className="space-y-6 pb-16">
       {/* Header Bar */}
       <FadeIn>
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 glass-card rounded-2xl border border-cream-300/70 shadow-elevated p-6">
-          <div className="flex items-center gap-3.5">
-            <div className="w-12 h-12 rounded-2xl bg-violet-600 flex items-center justify-center font-extrabold text-lg text-white shadow-glow-brand">
-              {user?.name?.charAt(0).toUpperCase() || 'C'}
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h1 className="text-xl sm:text-2xl font-extrabold text-cream-900 tracking-tight">
-                  Hello, {user?.name || 'Customer'}
-                </h1>
-                <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
-                  Customer
-                </span>
-              </div>
-              <p className="text-xs text-cream-500 mt-0.5">
-                Browse products, track active orders, and enjoy tailored ML recommendations
-              </p>
-            </div>
-          </div>
+        <div className="relative overflow-hidden rounded-3xl border border-border bg-card p-5 shadow-card sm:p-6">
+          <div aria-hidden className="pointer-events-none absolute -right-16 -top-20 size-64 rounded-full bg-[radial-gradient(circle,rgba(236,72,153,0.14),transparent_65%)]" />
+          <div aria-hidden className="pointer-events-none absolute -bottom-24 left-1/4 size-64 rounded-full bg-[radial-gradient(circle,rgba(139,92,246,0.16),transparent_65%)]" />
 
-          <div className="flex items-center gap-3">
-            <div className={`inline-flex items-center gap-2 text-xs px-3 py-1.5 rounded-full font-medium border ${
+          <div className="relative flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-center gap-3.5">
+              <div className="grid size-12 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-violet-500 via-pink-500 to-orange-400 font-extrabold text-lg text-white shadow-glow-brand">
+                {user?.name?.charAt(0).toUpperCase() || 'C'}
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h1 className="text-xl font-extrabold tracking-tight text-foreground sm:text-2xl">
+                    <TextGenerateEffect words={`Hello, ${user?.name || 'Customer'}`} className="text-xl font-extrabold tracking-tight text-foreground sm:text-2xl" />
+                  </h1>
+                  <Badge variant="secondary" className="rounded-full border border-emerald-400/25 bg-emerald-500/12 px-2.5 py-0.5 text-[10px] font-bold text-emerald-700">
+                    Customer
+                  </Badge>
+                </div>
+                <p className="mt-0.5 text-xs text-muted-foreground">
+                  Browse products, track active orders, and enjoy tailored ML recommendations
+                </p>
+              </div>
+            </div>
+
+            <div className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-medium ${
               connected
-                ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                : 'bg-cream-100 text-cream-500 border-cream-300/70'
+                ? 'border-emerald-400/25 bg-emerald-500/12 text-emerald-700'
+                : 'border-border bg-muted text-muted-foreground'
             }`}>
-              <span className={`h-2 w-2 rounded-full ${connected ? 'bg-emerald-500 animate-pulse' : 'bg-cream-400'}`} />
-              <span>{connected ? 'Live Sync Active' : 'Connecting…'}</span>
+              <span className={`size-2 rounded-full ${connected ? 'animate-pulse bg-emerald-500' : 'bg-muted-foreground/60'}`} />
+              {connected ? 'Live Sync Active' : 'Connecting…'}
             </div>
           </div>
         </div>
@@ -176,36 +272,36 @@ export default function CustomerDashboard() {
 
       {/* Order Alert Banner */}
       {orderMsg && (
-        <div className={`p-4 rounded-2xl text-xs sm:text-sm font-medium flex items-center justify-between gap-3 animate-fadeIn border ${
-          orderMsg.includes('successfully') || orderMsg.includes('updated')
-            ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-            : 'bg-coral-50 text-coral-700 border-coral-200'
+        <div className={`flex items-center justify-between gap-3 rounded-2xl border p-4 text-xs font-medium animate-fadeIn sm:text-sm ${
+          orderMsg.includes('successfully') || orderMsg.includes('updated') || orderMsg.includes('status updated')
+            ? 'border-emerald-400/40 bg-emerald-500/10 text-emerald-700'
+            : 'border-destructive/25 bg-destructive/10 text-destructive'
         }`}>
           <div className="flex items-center gap-2">
             {orderMsg.includes('successfully') || orderMsg.includes('updated') ? (
-              <CheckCircleIcon className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+              <CheckCircle2 className="size-4 flex-shrink-0 text-emerald-600" />
             ) : (
-              <AlertCircleIcon className="w-4 h-4 text-coral-600 flex-shrink-0" />
+              <AlertCircle className="size-4 flex-shrink-0 text-destructive" />
             )}
             <span>{orderMsg}</span>
           </div>
           <button
             onClick={() => setOrderMsg('')}
-            className="text-cream-400 hover:text-cream-700 p-1"
+            className="p-1 text-muted-foreground hover:text-foreground"
             aria-label="Dismiss notification"
           >
-            <XIcon className="w-4 h-4" />
+            <X className="size-4" />
           </button>
         </div>
       )}
 
       {/* Tabs Navigation */}
       <FadeIn>
-        <div className="flex gap-2 p-1.5 bg-cream-100 border border-cream-300/70 rounded-2xl max-w-md">
+        <div className="inline-flex rounded-2xl border border-border bg-muted/60 p-1">
           {[
-            { key: 'shop', label: 'Shop Catalog', icon: ShoppingBagIcon, count: null },
-            { key: 'orders', label: 'My Orders', icon: PackageIcon, count: orders.length },
-            { key: 'wishlist', label: 'Wishlist', icon: HeartIcon, count: wishlist.length },
+            { key: 'shop', label: 'Shop Catalog', icon: ShoppingBag, count: null },
+            { key: 'orders', label: 'My Orders', icon: Package, count: orders.length },
+            { key: 'wishlist', label: 'Wishlist', icon: Heart, count: wishlist.length },
           ].map((tab) => {
             const TabIcon = tab.icon;
             const isActive = activeTab === tab.key;
@@ -213,17 +309,22 @@ export default function CustomerDashboard() {
               <button
                 key={tab.key}
                 onClick={() => setActiveTab(tab.key)}
-                className={`flex-1 inline-flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl text-xs font-bold transition-all ${
-                  isActive
-                    ? 'bg-violet-600 text-white shadow-glow-brand'
-                    : 'text-cream-600 hover:text-cream-900 hover:bg-cream-50'
+                className={`relative flex flex-1 items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-xs font-bold transition-colors sm:flex-none ${
+                  isActive ? 'text-foreground' : 'text-muted-foreground hover:text-foreground'
                 }`}
               >
-                <TabIcon className={`w-3.5 h-3.5 ${isActive ? 'text-white' : 'text-cream-400'}`} />
-                <span>{tab.label}</span>
+                {isActive && (
+                  <motion.span
+                    layoutId="customer-tab-pill"
+                    transition={{ duration: 0.35, ease: EASE }}
+                    className="absolute inset-0 rounded-xl bg-card shadow-sm ring-1 ring-border"
+                  />
+                )}
+                <TabIcon className={`relative size-3.5 ${isActive ? 'text-primary' : 'text-muted-foreground'}`} />
+                <span className="relative">{tab.label}</span>
                 {tab.count !== null && tab.count > 0 && (
-                  <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-bold ${
-                    isActive ? 'bg-cream-50 text-violet-700' : 'bg-cream-200 text-cream-700'
+                  <span className={`relative rounded-full px-1.5 py-0.5 text-[10px] font-bold ${
+                    isActive ? 'bg-primary text-primary-foreground' : 'bg-border text-muted-foreground'
                   }`}>
                     {tab.count}
                   </span>
@@ -234,227 +335,389 @@ export default function CustomerDashboard() {
         </div>
       </FadeIn>
 
-      {/* TAB 1: SHOP */}
+      {/* ════════════ TAB 1: SHOP ════════════ */}
       {activeTab === 'shop' && (
-        <div className="space-y-8 animate-fadeIn">
+        <div className="space-y-6 animate-fadeIn">
           {/* ML Recommendations */}
           {recommendations.length > 0 && (
             <FadeIn>
-              <section className="relative overflow-hidden glass-card rounded-2xl p-5 sm:p-6 border border-cream-300/70">
-                <div className="absolute inset-0 bg-aurora-violet bg-aurora-emerald bg-aurora-coral opacity-40" />
-                <div className="relative">
-                  <div className="flex items-center gap-2 mb-3">
-                    <div className="w-7 h-7 rounded-lg bg-violet-600 text-white flex items-center justify-center shadow-glow-brand">
-                      <SparklesIcon className="w-4 h-4" />
+              <GlowingStarsBackgroundCard>
+                <div className="p-5 sm:p-6">
+                  <div className="mb-4 flex items-center gap-2">
+                    <div className="grid size-8 place-items-center rounded-xl bg-gradient-to-br from-violet-500 via-pink-500 to-orange-400 text-white shadow-glow-brand">
+                      <Sparkles className="size-4" />
                     </div>
                     <div>
-                      <h2 className="text-sm font-bold text-cream-900">Personalized for You (ML)</h2>
-                      <p className="text-xs text-cream-500">Collaborative filtering based on customer purchasing affinities</p>
+                      <GlowingStarsTitle>Personalized for You (ML)</GlowingStarsTitle>
+                      <GlowingStarsDescription>Collaborative filtering based on customer purchasing affinities</GlowingStarsDescription>
                     </div>
                   </div>
 
-                  <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-none">
-                    {recommendations.map((r) => (
-                      <div
-                        key={r.product_id}
-                        className="min-w-[200px] sm:min-w-[220px] bg-cream-50/70  rounded-2xl p-4 border border-violet-200 shadow-subtle flex flex-col justify-between"
-                      >
-                        <div>
-                          <div className="flex items-center justify-between mb-1.5">
-                            <span className="text-[10px] font-bold uppercase tracking-wider text-violet-700 bg-violet-50 px-2 py-0.5 rounded-full border border-violet-200">
+                  <div className="relative flex gap-3 overflow-x-auto pb-2 scrollbar-none">
+                    {recommendations.map((r) => {
+                      const rp = knownProducts[r.product_id];
+                      return (
+                        <div
+                          key={r.product_id}
+                          className="flex w-44 shrink-0 flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-subtle transition-all duration-300 hover:-translate-y-0.5 hover:ring-2 hover:ring-primary/40"
+                        >
+                          <Link to={`/product/${r.product_id}`} className="group/img relative block h-24 overflow-hidden bg-muted">
+                            {rp?.image_url ? (
+                              <img
+                                src={rp.image_url}
+                                alt={r.name}
+                                loading="lazy"
+                                className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 group-hover/img:scale-105"
+                              />
+                            ) : (
+                              <div className="absolute inset-0 grid place-items-center bg-gradient-to-br from-primary/15 to-pink/10">
+                                <Sparkles className="size-5 text-primary/50" />
+                              </div>
+                            )}
+                            <span className="absolute left-2 top-2 rounded-full bg-primary px-2 py-0.5 text-[10px] font-bold text-white shadow-sm">
                               {Math.round(Number(r.score) * 100)}% match
                             </span>
-                            <Link to={`/product/${r.product_id}`} className="text-xs font-semibold text-cream-400 hover:text-violet-700">
-                              View →
+                          </Link>
+                          <div className="flex flex-1 flex-col gap-1.5 p-3">
+                            <Link to={`/product/${r.product_id}`} className="line-clamp-1 text-xs font-bold text-foreground hover:text-primary">
+                              {r.name}
                             </Link>
+                            <div className="mt-auto flex items-center justify-between gap-2">
+                              <span className="text-sm font-extrabold tracking-tight text-foreground">
+                                {rp ? `₹${fmtINR(rp.sale_price)}` : ''}
+                              </span>
+                              <Button
+                                type="button"
+                                size="sm"
+                                className="h-7 gap-1 rounded-lg px-2 text-[11px] font-bold"
+                                onClick={() => addToCart(r.product_id)}
+                              >
+                                <ShoppingCart className="size-3" />
+                                {cart[r.product_id] ? `In cart (${cart[r.product_id]})` : 'Add'}
+                              </Button>
+                            </div>
                           </div>
-                          <p className="font-bold text-xs sm:text-sm text-cream-900 line-clamp-1">{r.name}</p>
                         </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </GlowingStarsBackgroundCard>
+            </FadeIn>
+          )}
+
+          <div className="gap-6 space-y-6 lg:grid lg:grid-cols-[250px_1fr] lg:space-y-0">
+            {/* ── Filter sidebar ── */}
+            <FadeIn>
+              <Card className="gap-0 p-5 ring-border/70 lg:sticky lg:top-20 lg:max-h-[calc(100vh-6rem)] lg:overflow-y-auto">
+                <div className="mb-4 flex items-center justify-between border-b border-border pb-3">
+                  <div className="flex items-center gap-2">
+                    <SlidersHorizontal className="size-4 text-primary" />
+                    <h2 className="text-sm font-bold text-foreground">Refine Results</h2>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={resetFilters}
+                    className="inline-flex items-center gap-1 text-[11px] font-semibold text-muted-foreground hover:text-primary"
+                  >
+                    <RotateCcw className="size-3" />
+                    Reset
+                  </button>
+                </div>
+
+                <form onSubmit={applyFilters} className="space-y-5">
+                  <div className="space-y-2">
+                    <Label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Search</Label>
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                      <Input
+                        value={filters.search}
+                        onChange={(e) => setFilter('search', e.target.value)}
+                        placeholder="Search products…"
+                        className="rounded-xl pl-9"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Sort by</Label>
+                    <Select
+                      value={filters.sort}
+                      onValueChange={(v) => { setFilter('sort', v); refreshProducts(); }}
+                    >
+                      <SelectTrigger className="rounded-xl">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {SORT_OPTIONS.map((o) => (
+                          <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Price range (₹)</Label>
+                    <div className="grid grid-cols-2 gap-2">
+                      <Input
+                        type="number"
+                        min="0"
+                        value={filters.min}
+                        onChange={(e) => setFilter('min', e.target.value)}
+                        placeholder="Min"
+                        className="rounded-xl"
+                      />
+                      <Input
+                        type="number"
+                        min="0"
+                        value={filters.max}
+                        onChange={(e) => setFilter('max', e.target.value)}
+                        placeholder="Max"
+                        className="rounded-xl"
+                      />
+                    </div>
+                    <Button type="submit" variant="outline" className="w-full rounded-xl text-xs font-bold">
+                      Apply price
+                    </Button>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Category</Label>
+                    <div className="flex flex-wrap gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => { setFilter('category', ''); refreshProducts(); }}
+                        className={`rounded-full px-2.5 py-1 text-[11px] font-bold transition-colors ${
+                          filters.category === ''
+                            ? 'bg-primary text-white'
+                            : 'bg-muted text-muted-foreground hover:bg-border'
+                        }`}
+                      >
+                        All
+                      </button>
+                      {categories.map((c) => (
                         <button
+                          key={c.id}
                           type="button"
-                          onClick={() => addToCart(r.product_id)}
-                          className="mt-3 w-full inline-flex items-center justify-center gap-1 py-1.5 bg-violet-600 hover:bg-violet-500 text-white text-xs font-semibold rounded-xl shadow-glow-brand transition-all hover:-translate-y-0.5"
+                          onClick={() => { setFilter('category', String(c.id)); refreshProducts(); }}
+                          className={`rounded-full px-2.5 py-1 text-[11px] font-bold transition-colors ${
+                            filters.category === String(c.id)
+                              ? 'bg-primary text-white'
+                              : 'bg-muted text-muted-foreground hover:bg-border'
+                          }`}
                         >
-                          <ShoppingCartIcon className="w-3 h-3" />
-                          <span>Add to cart {cart[r.product_id] ? `(${cart[r.product_id]})` : ''}</span>
+                          {c.name}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </form>
+              </Card>
+            </FadeIn>
+
+            {/* ── Catalog ── */}
+            <section className="min-w-0 space-y-4">
+              <FadeIn>
+                <div className="flex flex-col gap-3 rounded-2xl border border-border/70 bg-card p-4 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <h2 className="text-sm font-bold text-foreground sm:text-base">Shop Products</h2>
+                    <p className="text-xs text-muted-foreground">Select items to purchase from your preferred local retailer</p>
+                  </div>
+
+                  {retailers.length > 0 && (
+                    <div className="flex items-center gap-2">
+                      <span className="flex items-center gap-1 text-xs font-semibold text-muted-foreground">
+                        <Store className="size-3.5 text-muted-foreground" />
+                        Store:
+                      </span>
+                      <select
+                        value={retailerId}
+                        onChange={(e) => setRetailerId(Number(e.target.value))}
+                        className="cursor-pointer rounded-xl border border-input bg-card px-3 py-1.5 text-xs font-bold text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
+                      >
+                        {retailers.map((r) => (
+                          <option key={r.id} value={r.id}>
+                            {r.store_name} ({r.location || 'Store'})
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+                </div>
+              </FadeIn>
+
+              <Stagger className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-3">
+                {loading
+                  ? Array.from({ length: 6 }).map((_, i) => <SkeletonCard key={i} />)
+                  : products.map((p) => (
+                      <StaggerItem key={p.id}>
+                        <ProductCard
+                          product={p}
+                          onQuickView={addQuickView}
+                          footer={
+                            <div className="mt-3 flex items-center gap-2">
+                              <Button
+                                type="button"
+                                onClick={() => addToCart(p.id)}
+                                className="flex-1 gap-1.5 rounded-xl text-xs font-bold"
+                              >
+                                <ShoppingCart className="size-3.5" />
+                                Add {cart[p.id] ? `(${cart[p.id]})` : ''}
+                              </Button>
+                              <Button
+                                type="button"
+                                variant="outline"
+                                onClick={() => toggleWishlist(p.id)}
+                                className={`h-9 w-9 rounded-xl p-0 ${wishlist.some((w) => w.product_id === p.id) ? 'border-destructive/30 bg-destructive/10 text-destructive hover:bg-destructive/15' : 'text-muted-foreground hover:text-destructive'}`}
+                                title={wishlist.some((w) => w.product_id === p.id) ? 'Remove from wishlist' : 'Add to wishlist'}
+                              >
+                                <Heart className={`size-4 ${wishlist.some((w) => w.product_id === p.id) ? 'fill-destructive text-destructive' : ''}`} />
+                              </Button>
+                            </div>
+                          }
+                        />
+                      </StaggerItem>
+                    ))}
+              </Stagger>
+
+              {!loading && products.length === 0 && (
+                <EmptyState
+                  icon="🛒"
+                  title="No matching products"
+                  message="Try adjusting your filters or search — check back soon for freshly stocked catalog items."
+                  action={
+                    <Button type="button" variant="outline" className="rounded-xl text-xs font-bold" onClick={resetFilters}>
+                      Clear filters
+                    </Button>
+                  }
+                />
+              )}
+            </section>
+          </div>
+
+          {/* ══ Sticky Cart Breakdown Bar ══ */}
+          {cartCount > 0 && (
+            <div className="sticky bottom-4 z-30 animate-fadeIn rounded-2xl border border-border/70 bg-background/80 p-4 shadow-elevated backdrop-blur-xl sm:p-5">
+              <div className="grid gap-5 lg:grid-cols-[1fr_300px]">
+                {/* Cart items */}
+                <div>
+                  <div className="mb-3 flex items-center justify-between">
+                    <h3 className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                      <ShoppingCart className="size-3.5 text-primary" />
+                      Cart breakdown · {cartCount} item{cartCount > 1 ? 's' : ''}
+                    </h3>
+                    <button
+                      type="button"
+                      onClick={() => { setCart({}); setAppliedCoupon(null); setCouponInput(''); }}
+                      className="inline-flex items-center gap-1 text-[11px] font-semibold text-muted-foreground hover:text-destructive"
+                    >
+                      <Trash2 className="size-3" />
+                      Clear cart
+                    </button>
+                  </div>
+
+                  <div className="space-y-2">
+                    {cartItems.map(({ product, qty }) => (
+                      <div key={product.id} className="flex items-center gap-3 rounded-xl border border-border/70 bg-card p-2 pr-3">
+                        <Link
+                          to={`/product/${product.id}`}
+                          className="relative block size-12 shrink-0 overflow-hidden rounded-lg bg-muted"
+                        >
+                          {product.image_url ? (
+                            <img src={product.image_url} alt={product.name} loading="lazy" className="absolute inset-0 h-full w-full object-cover" />
+                          ) : (
+                            <span className="absolute inset-0 grid place-items-center text-[10px] font-bold text-muted-foreground">—</span>
+                          )}
+                        </Link>
+                        <div className="min-w-0 flex-1">
+                          <Link to={`/product/${product.id}`} className="block truncate text-xs font-bold text-foreground hover:text-primary">
+                            {product.name}
+                          </Link>
+                          <span className="text-[11px] text-muted-foreground">₹{fmtINR(product.sale_price)} each</span>
+                        </div>
+                        <div className="flex items-center gap-1 rounded-lg border border-border bg-muted p-0.5">
+                          <button type="button" onClick={() => decCart(product.id)} className="grid size-6 place-items-center rounded-md text-muted-foreground hover:bg-border hover:text-foreground" aria-label="Decrease quantity">
+                            <Minus className="size-3" />
+                          </button>
+                          <span className="w-6 text-center text-xs font-bold tabular-nums text-foreground">{qty}</span>
+                          <button type="button" onClick={() => addToCart(product.id)} className="grid size-6 place-items-center rounded-md text-muted-foreground hover:bg-border hover:text-foreground" aria-label="Increase quantity">
+                            <Plus className="size-3" />
+                          </button>
+                        </div>
+                        <span className="w-16 text-right text-xs font-extrabold tabular-nums text-foreground">₹{fmtINR(product.sale_price * qty)}</span>
+                        <button type="button" onClick={() => removeFromCart(product.id)} className="p-1 text-muted-foreground hover:text-destructive" aria-label="Remove item">
+                          <X className="size-3.5" />
                         </button>
                       </div>
                     ))}
                   </div>
-                </div>
-              </section>
-            </FadeIn>
-          )}
 
-          {/* Catalog Section */}
-          <section className="space-y-4">
-            <FadeIn>
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 glass-card p-4 rounded-2xl border border-cream-300/70">
-                <div>
-                  <h2 className="font-bold text-cream-900 text-sm sm:text-base">Shop Products</h2>
-                  <p className="text-xs text-cream-500">Select items to purchase from your preferred local retailer</p>
+                  <p className="mt-3 text-[11px] text-muted-foreground">
+                    Order fulfilling from:{' '}
+                    <strong className="text-foreground">{selectedStore?.store_name || 'Selected Retailer'}</strong>
+                  </p>
                 </div>
 
-                {retailers.length > 0 && (
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-semibold text-cream-500 flex items-center gap-1">
-                      <StoreIcon className="w-3.5 h-3.5 text-cream-400" />
-                      Store:
-                    </span>
-                    <select
-                      value={retailerId}
-                      onChange={(e) => setRetailerId(Number(e.target.value))}
-                      className="appearance-none bg-cream-50 hover:bg-cream-50 border border-cream-300 rounded-xl px-3 py-1.5 text-xs font-bold text-cream-800 focus:outline-none focus:ring-2 focus:ring-violet-500/30 cursor-pointer transition-all"
-                    >
-                      {retailers.map((r) => (
-                        <option key={r.id} value={r.id}>
-                          {r.store_name} ({r.location || 'Store'})
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                )}
-              </div>
-            </FadeIn>
-
-            {/* Products Grid */}
-            <Stagger className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5 sm:gap-6">
-              {loading
-                ? Array.from({ length: 8 }).map((_, i) => <SkeletonCard key={i} />)
-                : products.map((p) => (
-                    <StaggerItem key={p.id}>
-                      <ProductCard
-                        product={p}
-                        footer={
-                          <div className="mt-3 flex items-center gap-2">
-                            <button
-                              type="button"
-                              onClick={() => addToCart(p.id)}
-                              className="flex-1 inline-flex items-center justify-center gap-1.5 bg-violet-600 hover:bg-violet-500 text-white text-xs font-bold py-2 rounded-xl shadow-glow-brand transition-all hover:-translate-y-0.5"
-                            >
-                              <ShoppingCartIcon className="w-3.5 h-3.5" />
-                              <span>Add {cart[p.id] ? `(${cart[p.id]})` : ''}</span>
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => toggleWishlist(p.id)}
-                              className={`p-2 rounded-xl border text-xs font-bold transition-all ${
-                                wishlist.some((w) => w.product_id === p.id)
-                                  ? 'bg-coral-50 text-coral-700 border-coral-200'
-                                  : 'bg-cream-50 hover:bg-cream-100 text-cream-400 border-cream-300/70 hover:border-cream-300'
-                              }`}
-                              title={wishlist.some((w) => w.product_id === p.id) ? 'Remove from wishlist' : 'Add to wishlist'}
-                            >
-                              <HeartIcon
-                                filled={wishlist.some((w) => w.product_id === p.id)}
-                                className={`w-4 h-4 ${wishlist.some((w) => w.product_id === p.id) ? 'text-coral-600' : 'text-cream-400'}`}
-                              />
-                            </button>
-                          </div>
-                        }
-                      />
-                    </StaggerItem>
-                  ))}
-            </Stagger>
-
-            {!loading && products.length === 0 && (
-              <EmptyState
-                icon="🛒"
-                title="No products available"
-                message="Check back soon for freshly stocked catalog items."
-              />
-            )}
-          </section>
-
-          {/* Sticky / Docked Cart Summary Bar */}
-          {cartCount > 0 && (
-            <div className="sticky bottom-4 z-30 glass-strong rounded-2xl p-4 sm:p-5 shadow-elevated border border-cream-300 animate-fadeIn">
-              <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-                {/* Cart Info & Coupon Apply */}
-                <div className="flex flex-wrap items-center gap-4">
-                  <div className="flex items-center gap-2.5">
-                    <div className="w-10 h-10 rounded-2xl bg-violet-50 text-violet-600 border border-violet-200 flex items-center justify-center font-bold">
-                      <ShoppingCartIcon className="w-5 h-5" />
+                {/* Summary */}
+                <div className="flex flex-col gap-3 rounded-2xl border border-border/70 bg-card p-4">
+                  <div className="space-y-1.5 text-xs">
+                    <div className="flex items-center justify-between text-muted-foreground">
+                      <span>Subtotal</span>
+                      <span className="font-semibold tabular-nums text-foreground">₹{fmtINR(cartTotal)}</span>
                     </div>
-                    <div>
-                      <div className="flex items-baseline gap-2">
-                        <span className="text-sm font-bold text-cream-900">{cartCount} item{cartCount > 1 ? 's' : ''} in cart</span>
-                        {appliedCoupon ? (
-                          <span className="text-sm font-bold text-violet-700">
-                            ₹{Math.max(0, cartTotal - appliedCoupon.discount).toLocaleString('en-IN', { maximumFractionDigits: 2 })}
-                            <span className="text-xs text-cream-400 line-through ml-1.5">₹{cartTotal.toFixed(2)}</span>
-                            <span className="text-[11px] text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full ml-1 font-bold border border-emerald-200">
-                              −₹{appliedCoupon.discount} off
-                            </span>
-                          </span>
-                        ) : (
-                          <span className="text-sm font-bold text-cream-900">₹{cartTotal.toLocaleString('en-IN', { maximumFractionDigits: 2 })}</span>
-                        )}
+                    {appliedCoupon && (
+                      <div className="flex items-center justify-between text-emerald-700">
+                        <span className="flex items-center gap-1">
+                          <Tag className="size-3" />
+                          Coupon {appliedCoupon.code}
+                        </span>
+                        <span className="font-semibold tabular-nums">−₹{fmtINR(appliedCoupon.discount)}</span>
                       </div>
-                      <p className="text-[11px] text-cream-500">
-                        Order fulfilling from: <strong className="text-cream-800">{selectedStore?.store_name || 'Selected Retailer'}</strong>
-                      </p>
+                    )}
+                    <div className="flex items-center justify-between border-t border-border pt-2 text-sm">
+                      <span className="font-bold text-foreground">Total</span>
+                      <span className="text-lg font-extrabold tabular-nums tracking-tight text-foreground">₹{fmtINR(cartFinalTotal)}</span>
                     </div>
                   </div>
 
-                  {/* Coupon Code Input */}
-                  <div className="flex items-center gap-2">
-                    <div className="relative">
-                      <input
+                  {/* Coupon */}
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <Input
                         value={couponInput}
                         onChange={(e) => setCouponInput(e.target.value)}
                         placeholder="Coupon code (e.g. SAVE10)"
                         disabled={!!appliedCoupon}
-                        className={`bg-cream-50 border border-cream-300 rounded-xl px-3 py-1.5 text-xs text-cream-900 placeholder-cream-400 w-36 sm:w-44 uppercase font-mono tracking-wider focus:outline-none focus:ring-2 focus:ring-violet-500/30 ${
-                          appliedCoupon ? 'bg-emerald-50 border-emerald-200 text-emerald-800' : ''
-                        }`}
+                        className="h-8 font-mono text-[11px] uppercase tracking-wider rounded-lg"
                       />
+                      {appliedCoupon ? (
+                        <Button type="button" variant="ghost" size="sm" className="h-8 px-2 text-[11px] font-bold text-destructive" onClick={() => setAppliedCoupon(null)}>
+                          Remove
+                        </Button>
+                      ) : (
+                        <Button type="button" variant="outline" size="sm" className="h-8 px-3 text-[11px] font-bold" onClick={applyCoupon}>
+                          Apply
+                        </Button>
+                      )}
                     </div>
-                    {appliedCoupon ? (
-                      <button
-                        type="button"
-                        onClick={() => setAppliedCoupon(null)}
-                        className="text-xs text-coral-700 hover:text-coral-600 font-semibold underline"
-                      >
-                        Remove
-                      </button>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={applyCoupon}
-                        className="px-3 py-1.5 rounded-xl border border-cream-300 bg-cream-50 hover:bg-cream-100 text-xs font-semibold text-cream-700 transition-colors"
-                      >
-                        Apply
-                      </button>
-                    )}
+                    {couponErr && <p className="text-[11px] font-medium text-destructive">{couponErr}</p>}
                   </div>
-                  {couponErr && <span className="text-xs text-coral-700">{couponErr}</span>}
-                </div>
 
-                {/* Actions */}
-                <div className="flex items-center gap-2.5 justify-end">
-                  <button
-                    type="button"
-                    onClick={() => { setCart({}); setAppliedCoupon(null); setCouponInput(''); }}
-                    className="px-3 py-2 rounded-xl text-xs font-semibold text-cream-500 hover:text-coral-700 transition-colors"
-                  >
-                    Clear Cart
-                  </button>
-                  <button
+                  <Button
                     type="button"
                     onClick={placeOrder}
                     disabled={placing}
-                    className="inline-flex items-center gap-2 bg-violet-600 hover:bg-violet-500 text-white font-extrabold px-6 py-2.5 rounded-2xl text-xs tracking-wide shadow-glow-brand transition-all hover:-translate-y-0.5 disabled:opacity-50 cursor-pointer"
+                    className="mt-auto w-full gap-2 rounded-xl text-xs font-extrabold tracking-wide"
                   >
                     {placing ? (
                       <span>Placing Order…</span>
                     ) : (
                       <>
                         <span>Place Order Now</span>
-                        <ArrowRightIcon className="w-3.5 h-3.5" />
+                        <ArrowRight className="size-3.5" />
                       </>
                     )}
-                  </button>
+                  </Button>
                 </div>
               </div>
             </div>
@@ -462,18 +725,18 @@ export default function CustomerDashboard() {
         </div>
       )}
 
-      {/* TAB 2: ORDERS */}
+      {/* ════════════ TAB 2: ORDERS ════════════ */}
       {activeTab === 'orders' && (
-        <div className="space-y-4 animate-fadeIn">
+        <div className="space-y-5 animate-fadeIn">
           <div className="flex items-center justify-between">
-            <h2 className="font-bold text-cream-900 text-base sm:text-lg">Order History & Status</h2>
-            <span className="text-xs text-cream-400">{orders.length} order{orders.length === 1 ? '' : 's'} placed</span>
+            <h2 className="text-base font-bold text-foreground sm:text-lg">Order History &amp; Status</h2>
+            <span className="text-xs text-muted-foreground">{orders.length} order{orders.length === 1 ? '' : 's'} placed</span>
           </div>
 
           {loading ? (
             <div className="space-y-4">
               {[1, 2, 3].map((i) => (
-                <div key={i} className="h-36 rounded-2xl shimmer-wave bg-cream-200" />
+                <div key={i} className="h-36 rounded-2xl shimmer bg-muted/60" />
               ))}
             </div>
           ) : orders.length === 0 ? (
@@ -482,64 +745,53 @@ export default function CustomerDashboard() {
               title="No orders yet"
               message="You haven't placed any orders yet. Head over to the Shop tab to place your first order!"
               action={
-                <button
-                  onClick={() => setActiveTab('shop')}
-                  className="px-4 py-2 rounded-xl bg-violet-600 hover:bg-violet-500 text-white text-xs font-bold shadow-glow-brand transition-all hover:-translate-y-0.5"
-                >
+                <Button type="button" className="rounded-xl text-xs font-bold" onClick={() => setActiveTab('shop')}>
                   Start Shopping
-                </button>
+                </Button>
               }
             />
           ) : (
             <Stagger className="space-y-5">
               {orders.map((o) => (
-                <StaggerItem
-                  key={o.id}
-                  className="glass-card rounded-2xl border border-cream-300/70 shadow-subtle p-5 sm:p-6 space-y-4"
-                >
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-cream-300/70">
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className="font-extrabold text-sm sm:text-base text-cream-900">Order #{o.id}</span>
-                        <StatusBadge status={o.status} />
-                      </div>
-                      <p className="text-xs text-cream-500 mt-0.5">
-                        Placed on {new Date(o.created_at).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })} · Fulfilling store: <strong className="text-cream-800">{o.retailer}</strong>
-                      </p>
-                    </div>
-
-                    <div className="flex items-baseline gap-1">
-                      <span className="text-xs text-cream-500">Total:</span>
-                      <span className="text-lg font-extrabold text-cream-900">₹{o.total_amount}</span>
-                    </div>
-                  </div>
-
-                  {/* Order Progress Stepper */}
-                  <OrderTimeline status={o.status} />
-
-                  {/* Purchased Items List */}
-                  <div className="pt-2">
-                    <p className="text-[11px] font-bold uppercase tracking-wider text-cream-400 mb-2">
-                      Items Ordered ({o.items?.length || 0})
-                    </p>
-                    <div className="flex flex-wrap gap-2">
-                      {o.items?.map((it) => (
-                        <div
-                          key={it.product_id}
-                          className="inline-flex items-center gap-2 bg-cream-50 border border-cream-300/70 px-3 py-1.5 rounded-xl text-xs"
-                        >
-                          <Link
-                            to={`/product/${it.product_id}`}
-                            className="font-bold text-cream-800 hover:text-violet-700 transition-colors"
-                          >
-                            {it.name}
-                          </Link>
-                          <span className="text-cream-400 font-semibold">× {it.quantity}</span>
-                          <span className="text-cream-600 font-mono text-[11px]">@ ₹{it.unit_price}</span>
+                <StaggerItem key={o.id}>
+                  <Card className="gap-0 space-y-4 p-5 ring-border/70 sm:p-6">
+                    <div className="flex flex-col gap-2 border-b border-border pb-3 sm:flex-row sm:items-center sm:justify-between">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="mono-num text-sm font-bold tracking-tight text-foreground sm:text-base">Order #{o.id}</span>
+                          <StatusBadge status={o.status} />
                         </div>
-                      ))}
+                        <p className="mt-0.5 text-xs text-muted-foreground">
+                          Placed on {new Date(o.created_at).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })} · Fulfilling store: <strong className="text-foreground">{o.retailer}</strong>
+                        </p>
+                      </div>
+                      <div className="flex items-baseline gap-1">
+                        <span className="text-xs text-muted-foreground">Total:</span>
+                        <span className="text-lg font-extrabold text-foreground">₹{o.total_amount}</span>
+                      </div>
                     </div>
-                  </div>
+
+                    <OrderTimeline status={o.status} />
+
+                    <div>
+                      <p className="mb-2 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+                        Items ordered ({o.items?.length || 0})
+                      </p>
+                      <div className="flex flex-wrap gap-2">
+                        {o.items?.map((it) => (
+                          <Link
+                            key={it.product_id}
+                            to={`/product/${it.product_id}`}
+                            className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-muted px-3 py-1.5 text-xs transition-colors hover:border-primary/40 hover:bg-primary/5"
+                          >
+                            <span className="font-bold text-foreground">{it.name}</span>
+                            <span className="font-semibold text-muted-foreground">× {it.quantity}</span>
+                            <span className="font-mono text-[11px] text-primary">@ ₹{it.unit_price}</span>
+                          </Link>
+                        ))}
+                      </div>
+                    </div>
+                  </Card>
                 </StaggerItem>
               ))}
             </Stagger>
@@ -547,16 +799,16 @@ export default function CustomerDashboard() {
         </div>
       )}
 
-      {/* TAB 3: WISHLIST */}
+      {/* ════════════ TAB 3: WISHLIST ════════════ */}
       {activeTab === 'wishlist' && (
-        <div className="space-y-4 animate-fadeIn">
+        <div className="space-y-5 animate-fadeIn">
           <div className="flex items-center justify-between">
-            <h2 className="font-bold text-cream-900 text-base sm:text-lg">Saved Wishlist</h2>
-            <span className="text-xs text-cream-400">{wishlist.length} item{wishlist.length === 1 ? '' : 's'} saved</span>
+            <h2 className="text-base font-bold text-foreground sm:text-lg">Saved Wishlist</h2>
+            <span className="text-xs text-muted-foreground">{wishlist.length} item{wishlist.length === 1 ? '' : 's'} saved</span>
           </div>
 
           {loading ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-5">
+            <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4">
               {Array.from({ length: 4 }).map((_, i) => <SkeletonCard key={i} />)}
             </div>
           ) : wishlist.length === 0 ? (
@@ -565,38 +817,37 @@ export default function CustomerDashboard() {
               title="Your wishlist is empty"
               message="Tap the heart icon on any product in the catalog to save it for later."
               action={
-                <button
-                  onClick={() => setActiveTab('shop')}
-                  className="px-4 py-2 rounded-xl bg-violet-600 hover:bg-violet-500 text-white text-xs font-bold shadow-glow-brand transition-all hover:-translate-y-0.5"
-                >
+                <Button type="button" className="rounded-xl text-xs font-bold" onClick={() => setActiveTab('shop')}>
                   Browse Products
-                </button>
+                </Button>
               }
             />
           ) : (
-            <Stagger className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5 sm:gap-6">
+            <Stagger className="grid grid-cols-1 gap-5 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4">
               {wishlist.map((w) => (
                 <StaggerItem key={w.wishlist_id || w.id}>
                   <ProductCard
                     product={w}
+                    onQuickView={addQuickView}
                     footer={
                       <div className="mt-3 flex items-center gap-2">
-                        <button
+                        <Button
                           type="button"
                           onClick={() => addToCart(w.product_id)}
-                          className="flex-1 inline-flex items-center justify-center gap-1.5 bg-violet-600 hover:bg-violet-500 text-white text-xs font-bold py-2 rounded-xl shadow-glow-brand transition-all hover:-translate-y-0.5"
+                          className="flex-1 gap-1.5 rounded-xl text-xs font-bold"
                         >
-                          <ShoppingCartIcon className="w-3.5 h-3.5" />
-                          <span>Add {cart[w.product_id] ? `(${cart[w.product_id]})` : ''}</span>
-                        </button>
-                        <button
+                          <ShoppingCart className="size-3.5" />
+                          Add {cart[w.product_id] ? `(${cart[w.product_id]})` : ''}
+                        </Button>
+                        <Button
                           type="button"
+                          variant="outline"
                           onClick={() => toggleWishlist(w.product_id)}
-                          className="p-2 rounded-xl border border-coral-200 bg-coral-50 text-coral-700 hover:bg-coral-100 text-xs font-bold transition-all"
+                          className="h-9 w-9 rounded-xl border-destructive/30 bg-destructive/10 p-0 text-destructive hover:bg-destructive/15"
                           title="Remove from wishlist"
                         >
-                          <XIcon className="w-4 h-4" />
-                        </button>
+                          <X className="size-4" />
+                        </Button>
                       </div>
                     }
                   />
@@ -605,6 +856,16 @@ export default function CustomerDashboard() {
             </Stagger>
           )}
         </div>
+      )}
+
+      {/* Quick view dialog */}
+      {quickView && (
+        <ProductQuickView
+          product={quickView}
+          open={!!quickView}
+          onOpenChange={(o) => { if (!o) setQuickView(null); }}
+          onAddToCart={(p) => { addToCart(p.id); setQuickView(null); }}
+        />
       )}
     </div>
   );

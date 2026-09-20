@@ -1,4 +1,4 @@
-import { ArrowLeftIcon, ArrowRightIcon } from './Icons';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 
 export default function Pagination({ page, totalPages, onPageChange }) {
   if (totalPages <= 1) return null;
@@ -18,15 +18,18 @@ export default function Pagination({ page, totalPages, onPageChange }) {
 
   const pages = getPageNumbers();
 
+  const navBtn =
+    'inline-flex h-9 items-center gap-1 rounded-xl border border-border bg-card px-3 text-xs font-semibold text-muted-foreground shadow-subtle transition-all hover:-translate-y-0.5 hover:border-primary/40 hover:bg-muted hover:text-primary disabled:pointer-events-none disabled:opacity-30';
+
   return (
-    <nav className="flex items-center justify-center gap-1.5 mt-8" aria-label="Pagination Navigation">
+    <nav className="mt-8 flex items-center justify-center gap-1.5" aria-label="Pagination Navigation">
       <button
         onClick={() => onPageChange(page - 1)}
         disabled={page <= 1}
-        className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl border border-cream-300/70 text-xs font-semibold text-cream-600 bg-cream-50 shadow-subtle hover:bg-violet-50 hover:text-violet-700 hover:border-violet-200 disabled:opacity-30 disabled:pointer-events-none transition-all"
+        className={navBtn}
         aria-label="Previous page"
       >
-        <ArrowLeftIcon className="w-3.5 h-3.5" />
+        <ChevronLeft className="size-3.5" />
         <span className="hidden sm:inline">Prev</span>
       </button>
 
@@ -34,7 +37,7 @@ export default function Pagination({ page, totalPages, onPageChange }) {
         {pages.map((p, idx) => {
           if (p === '...') {
             return (
-              <span key={`ellipsis-${idx}`} className="px-2 text-xs text-cream-400 select-none">
+              <span key={`ellipsis-${idx}`} className="px-2 text-xs text-muted-foreground select-none">
                 …
               </span>
             );
@@ -44,10 +47,10 @@ export default function Pagination({ page, totalPages, onPageChange }) {
             <button
               key={p}
               onClick={() => onPageChange(p)}
-              className={`w-8 h-8 rounded-xl text-xs font-bold transition-all ${
+              className={`h-9 w-9 rounded-xl text-xs font-bold transition-all ${
                 isCurrent
-                  ? 'bg-violet-600 text-white shadow-glow-brand scale-105'
-                  : 'bg-cream-50 text-cream-600 hover:bg-cream-100 hover:text-violet-700 border border-cream-300/70 shadow-subtle'
+                  ? 'scale-105 bg-gradient-to-br from-primary to-[#8b5cf6] text-primary-foreground shadow-glow-brand'
+                  : 'border border-border bg-card text-muted-foreground shadow-subtle hover:border-primary/40 hover:bg-muted hover:text-primary'
               }`}
               aria-current={isCurrent ? 'page' : undefined}
             >
@@ -60,11 +63,11 @@ export default function Pagination({ page, totalPages, onPageChange }) {
       <button
         onClick={() => onPageChange(page + 1)}
         disabled={page >= totalPages}
-        className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl border border-cream-300/70 text-xs font-semibold text-cream-600 bg-cream-50 shadow-subtle hover:bg-violet-50 hover:text-violet-700 hover:border-violet-200 disabled:opacity-30 disabled:pointer-events-none transition-all"
+        className={navBtn}
         aria-label="Next page"
       >
         <span className="hidden sm:inline">Next</span>
-        <ArrowRightIcon className="w-3.5 h-3.5" />
+        <ChevronRight className="size-3.5" />
       </button>
     </nav>
   );

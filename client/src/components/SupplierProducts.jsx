@@ -1,13 +1,19 @@
 import { useEffect, useState } from 'react';
+import { motion } from 'framer-motion';
 import api from '../api/client';
-import { SkeletonTable } from '../components/Skeleton';
-import EmptyState from '../components/EmptyState';
-import { PlusIcon, TrashIcon, CheckCircleIcon, AlertCircleIcon } from '../components/Icons';
+import { SkeletonTable } from './Skeleton';
+import EmptyState from './EmptyState';
+import DataTable from './DataTable';
+import { PlusIcon, TrashIcon, CheckCircleIcon, AlertCircleIcon } from './Icons';
+import { Button } from './ui/button';
+import { EASE } from '../lib/motion';
 
-const imgFallback = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="80" height="80"%3E%3Crect width="100%25" height="100%25" fill="%23E1DDF0"/%3E%3Ctext x="50%25" y="50%25" fill="%23786F97" font-size="10" font-family="sans-serif" font-weight="600" text-anchor="middle"%3Eno img%3C/text%3E%3C/svg%3E';
+const imgFallback = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="80" height="80"%3E%3Crect width="100%25" height="100%25" fill="%23263247"/%3E%3Ctext x="50%25" y="50%25" fill="%2364748B" font-size="10" font-family="sans-serif" font-weight="600" text-anchor="middle"%3Eno img%3C/text%3E%3C/svg%3E';
 
-const inputClass =
-  'w-full bg-cream-50 hover:bg-cream-50 border border-cream-300 hover:border-cream-400 rounded-xl px-3.5 py-2.5 text-sm text-cream-800 placeholder-cream-400 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all';
+const fieldClass =
+  'w-full rounded-xl border border-input bg-input/30 px-3.5 py-2.5 text-sm text-foreground placeholder:text-muted-foreground outline-none transition-all hover:border-primary/30 focus-visible:border-primary focus-visible:bg-background focus-visible:ring-3 focus-visible:ring-primary/25';
+
+const labelClass = 'label-micro mb-1.5';
 
 export default function SupplierProducts({ supplierId }) {
   const [products, setProducts] = useState([]);
@@ -87,73 +93,81 @@ export default function SupplierProducts({ supplierId }) {
 
   return (
     <section className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 className="font-extrabold text-cream-900 text-base sm:text-lg">Product Catalog</h2>
-          <p className="text-xs text-cream-500">Add, configure, and maintain products offered to retailers</p>
+          <h2 className="text-base font-extrabold tracking-tight text-foreground sm:text-lg">Product Catalog</h2>
+          <p className="mt-0.5 text-xs text-muted-foreground">Add, configure, and maintain products offered to retailers</p>
         </div>
 
-        <button
+        <Button
           type="button"
-          onClick={() => (form ? setForm(null) : setForm({ name: '', description: '', category_id: '', cost_price: '', sale_price: '' }))}
-          className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold transition-all shadow-subtle ${
-            form
-              ? 'bg-cream-100 hover:bg-cream-200 text-cream-700 border border-cream-300/70'
-              : 'bg-violet-600 hover:bg-violet-500 text-white shadow-glow-brand hover:shadow-glow-brand hover:-translate-y-0.5'
-          }`}
+          onClick={() => (form ? setForm(null) : resetForm())}
+          variant={form ? 'outline' : 'default'}
+          size="lg"
+          className="gap-1.5 rounded-xl text-xs font-bold"
         >
-          {form ? 'Cancel' : '+ Add Product'}
-        </button>
+          {form ? 'Cancel' : (
+            <>
+              <PlusIcon className="size-3.5" />
+              Add Product
+            </>
+          )}
+        </Button>
       </div>
 
       {message && (
-        <div className={`p-4 rounded-2xl text-xs sm:text-sm font-medium flex items-center gap-2 ${
-          message.includes('✅')
-            ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-            : 'bg-coral-50 text-coral-700 border border-coral-200'
-        }`}>
+        <motion.div
+          initial={{ opacity: 0, y: -6 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3, ease: EASE }}
+          className={`flex items-center gap-2 rounded-2xl border p-4 text-xs font-medium sm:text-sm ${
+            message.includes('✅')
+              ? 'border-emerald-400/40 bg-emerald-500/12 text-emerald-700'
+              : 'border-orange-400/40 bg-orange-500/12 text-orange-700'
+          }`}
+        >
           {message.includes('✅') ? (
-            <CheckCircleIcon className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+            <CheckCircleIcon className="h-4 w-4 flex-shrink-0 text-emerald-500" />
           ) : (
-            <AlertCircleIcon className="w-4 h-4 text-coral-600 flex-shrink-0" />
+            <AlertCircleIcon className="h-4 w-4 flex-shrink-0 text-orange-500" />
           )}
-          <span>{message}</span>
-        </div>
+          <span>{message.replace(/^[✅❌]\s*/, '')}</span>
+        </motion.div>
       )}
 
       {form && (
-        <form
+        <motion.form
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4, ease: EASE }}
           onSubmit={submit}
-          className="glass-card rounded-2xl p-6 sm:p-8 space-y-6 animate-fadeIn"
+          className="relative overflow-hidden rounded-2xl border border-border bg-card p-6 shadow-card sm:p-8"
         >
-          <div className="border-b border-cream-300/70 pb-3">
-            <h3 className="font-extrabold text-sm text-cream-900">New Product Details</h3>
-            <p className="text-xs text-cream-500">Fill in the specifications for this new catalog item</p>
+          <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-primary/40 to-transparent" />
+          <div className="border-b border-border pb-3">
+            <h3 className="text-sm font-extrabold text-foreground">New Product Details</h3>
+            <p className="mt-0.5 text-xs text-muted-foreground">Fill in the specifications for this new catalog item</p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+          <div className="mt-6 grid grid-cols-1 gap-5 md:grid-cols-2">
             <div>
-              <label className="block text-xs font-bold text-cream-600 uppercase tracking-wider mb-1.5">
-                Product Name *
-              </label>
+              <label className={labelClass}>Product Name *</label>
               <input
                 required
                 placeholder="e.g. Organic Arabica Coffee Beans"
                 value={form.name}
                 onChange={(e) => setForm({ ...form, name: e.target.value })}
-                className={inputClass}
+                className={fieldClass}
               />
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-cream-600 uppercase tracking-wider mb-1.5">
-                Category *
-              </label>
+              <label className={labelClass}>Category *</label>
               <select
                 required
                 value={form.category_id}
                 onChange={(e) => setForm({ ...form, category_id: e.target.value })}
-                className={`${inputClass} cursor-pointer`}
+                className={`${fieldClass} cursor-pointer`}
               >
                 <option value="" disabled>Select category</option>
                 {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
@@ -161,22 +175,18 @@ export default function SupplierProducts({ supplierId }) {
             </div>
 
             <div className="md:col-span-2">
-              <label className="block text-xs font-bold text-cream-600 uppercase tracking-wider mb-1.5">
-                Description
-              </label>
+              <label className={labelClass}>Description</label>
               <textarea
                 value={form.description}
                 onChange={(e) => setForm({ ...form, description: e.target.value })}
                 rows={2}
                 placeholder="Product highlights, specifications, or packaging info..."
-                className={inputClass}
+                className={`${fieldClass} resize-none`}
               />
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-cream-600 uppercase tracking-wider mb-1.5">
-                Cost Price (₹) *
-              </label>
+              <label className={labelClass}>Cost Price (₹) *</label>
               <input
                 required
                 type="number"
@@ -185,14 +195,12 @@ export default function SupplierProducts({ supplierId }) {
                 placeholder="0.00"
                 value={form.cost_price}
                 onChange={(e) => setForm({ ...form, cost_price: e.target.value })}
-                className={inputClass}
+                className={fieldClass}
               />
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-cream-600 uppercase tracking-wider mb-1.5">
-                Sale Price (₹) *
-              </label>
+              <label className={labelClass}>Sale Price (₹) *</label>
               <input
                 required
                 type="number"
@@ -201,25 +209,26 @@ export default function SupplierProducts({ supplierId }) {
                 placeholder="0.00"
                 value={form.sale_price}
                 onChange={(e) => setForm({ ...form, sale_price: e.target.value })}
-                className={inputClass}
+                className={fieldClass}
               />
               {margin !== null && (
-                <p className="text-[11px] font-semibold text-emerald-600 mt-1">
+                <p className="mt-1 text-[11px] font-semibold text-emerald-400">
                   Estimated Unit Gross Margin: ₹{margin}
                 </p>
               )}
             </div>
 
-            <div className="md:col-span-2 pt-2 border-t border-cream-300/70">
-              <label className="block text-xs font-bold text-cream-600 uppercase tracking-wider mb-2">
+            <div className="pt-2 md:col-span-2">
+              <label className={`${labelClass} mt-2`}>
                 Product Image
+                <span className="ml-1.5 font-normal normal-case text-muted-foreground">— JPG, PNG, or WebP up to 2MB</span>
               </label>
               <div className="flex items-center gap-4">
-                <div className="h-20 w-20 rounded-2xl border border-cream-300/70 overflow-hidden bg-cream-200 flex items-center justify-center flex-shrink-0">
+                <div className="grid h-20 w-20 shrink-0 place-items-center overflow-hidden rounded-2xl border border-border bg-muted/40">
                   {preview ? (
                     <img src={preview} alt="Preview" className="h-full w-full object-cover" />
                   ) : (
-                    <span className="text-[10px] font-bold text-cream-400">preview</span>
+                    <span className="text-[10px] font-bold text-muted-foreground">preview</span>
                   )}
                 </div>
                 <div className="flex-1">
@@ -227,31 +236,32 @@ export default function SupplierProducts({ supplierId }) {
                     type="file"
                     accept="image/*"
                     onChange={(e) => handleFile(e.target.files?.[0])}
-                    className="text-xs text-cream-500 file:mr-3 file:py-2 file:px-4 file:rounded-xl file:border-0 file:bg-cream-100 file:text-cream-700 file:font-semibold hover:file:bg-cream-200 cursor-pointer"
+                    className="file:mr-3 file:cursor-pointer file:rounded-xl file:border-0 file:bg-primary/15 file:px-4 file:py-2 file:text-xs file:font-semibold file:text-primary file:transition-colors hover:file:bg-primary/25 cursor-pointer text-xs text-muted-foreground"
                   />
-                  <p className="text-[10px] text-cream-400 mt-1">JPG, PNG, or WebP up to 2MB</p>
                 </div>
               </div>
             </div>
           </div>
 
-          <div className="flex justify-end gap-2 pt-3 border-t border-cream-300/70">
-            <button
+          <div className="mt-6 flex justify-end gap-2 border-t border-border pt-5">
+            <Button
               type="button"
+              variant="ghost"
               onClick={() => setForm(null)}
-              className="px-4 py-2.5 rounded-xl text-xs font-bold text-cream-500 hover:bg-cream-100 transition-colors"
+              className="rounded-xl px-4 text-xs font-bold"
             >
               Cancel
-            </button>
-            <button
+            </Button>
+            <Button
               type="submit"
               disabled={submitting}
-              className="inline-flex items-center gap-2 bg-violet-600 hover:bg-violet-500 text-white text-xs font-bold px-6 py-2.5 rounded-xl transition-all shadow-glow-brand hover:shadow-glow-brand hover:-translate-y-0.5 disabled:opacity-40"
+              size="lg"
+              className="gap-2 rounded-xl px-6 text-xs font-bold"
             >
               {submitting ? 'Uploading Product…' : 'Create Product'}
-            </button>
+            </Button>
           </div>
-        </form>
+        </motion.form>
       )}
 
       {loading ? (
@@ -263,65 +273,87 @@ export default function SupplierProducts({ supplierId }) {
           message="Click '+ Add Product' above to start stocking your supplier catalog."
         />
       ) : (
-        <div className="glass-card rounded-2xl overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-xs sm:text-sm text-left">
-              <thead className="bg-cream-100 border-b border-cream-300/70 text-cream-500 font-bold uppercase tracking-wider text-[10px]">
-                <tr>
-                  <th className="p-3.5 sm:p-4">Image</th>
-                  <th className="p-3.5 sm:p-4">Product Name</th>
-                  <th className="p-3.5 sm:p-4">Category</th>
-                  <th className="p-3.5 sm:p-4">Cost Price</th>
-                  <th className="p-3.5 sm:p-4">Sale Price</th>
-                  <th className="p-3.5 sm:p-4 text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-cream-300/60 font-medium">
-                {products.map((p) => (
-                  <tr key={p.id} className="hover:bg-cream-50 transition-colors">
-                    <td className="p-3.5 sm:p-4">
-                      <div className="w-12 h-12 rounded-xl bg-cream-200 overflow-hidden border border-cream-300/70">
-                        <img
-                          src={p.image_url || imgFallback}
-                          alt={p.name}
-                          className="w-full h-full object-cover"
-                          onError={(e) => { e.currentTarget.src = imgFallback; }}
-                        />
-                      </div>
-                    </td>
-                    <td className="p-3.5 sm:p-4">
-                      <span className="font-bold text-cream-800 block">{p.name}</span>
-                      {p.description && (
-                        <span className="text-xs text-cream-500 line-clamp-1 max-w-xs">{p.description}</span>
-                      )}
-                    </td>
-                    <td className="p-3.5 sm:p-4">
-                      <span className="inline-block px-2.5 py-0.5 rounded-full text-xs font-semibold bg-cream-100 text-cream-700 border border-cream-300/70">
-                        {p.category || 'General'}
-                      </span>
-                    </td>
-                    <td className="p-3.5 sm:p-4 font-mono font-bold text-cream-600">
-                      ₹{p.cost_price}
-                    </td>
-                    <td className="p-3.5 sm:p-4 font-mono font-bold text-violet-700">
-                      ₹{p.sale_price}
-                    </td>
-                    <td className="p-3.5 sm:p-4 text-right">
-                      <button
-                        type="button"
-                        onClick={() => removeProduct(p.id)}
-                        className="inline-flex items-center gap-1 text-xs font-bold text-coral-700 hover:text-coral-600 bg-coral-50 hover:bg-coral-100 px-3 py-1.5 rounded-xl border border-coral-200 transition-all"
-                      >
-                        <TrashIcon className="w-3.5 h-3.5" />
-                        <span>Delete</span>
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
+        <DataTable
+          rows={products}
+          rowKey={(p) => p.id}
+          searchable
+          searchKeys={['name', 'category', 'description']}
+          searchPlaceholder="Search catalog…"
+          pageSize={8}
+          columns={[
+            {
+              key: 'image',
+              header: 'Product',
+              render: (p) => (
+                <div className="flex items-center gap-3">
+                  <div className="size-12 shrink-0 overflow-hidden rounded-xl border border-border bg-muted/40">
+                    <img
+                      src={p.image_url || imgFallback}
+                      alt={p.name}
+                      className="h-full w-full object-cover"
+                      onError={(e) => { e.currentTarget.src = imgFallback; }}
+                    />
+                  </div>
+                  <div className="min-w-0">
+                    <span className="block truncate font-bold text-foreground">{p.name}</span>
+                    {p.description && (
+                      <span className="block max-w-xs truncate text-[11px] text-muted-foreground">{p.description}</span>
+                    )}
+                  </div>
+                </div>
+              ),
+            },
+            {
+              key: 'category',
+              header: 'Category',
+              sortable: true,
+              render: (p) => (
+                <span className="inline-block rounded-full border border-border bg-muted px-2.5 py-0.5 text-xs font-semibold text-muted-foreground">
+                  {p.category || 'General'}
+                </span>
+              ),
+            },
+            {
+              key: 'cost_price',
+              header: 'Cost Price',
+              align: 'right',
+              sortable: true,
+              sortValue: (p) => Number(p.cost_price) || 0,
+              render: (p) => (
+                <span className="mono-num text-xs font-bold tabular-nums text-muted-foreground">
+                  ₹{p.cost_price}
+                </span>
+              ),
+            },
+            {
+              key: 'sale_price',
+              header: 'Sale Price',
+              align: 'right',
+              sortable: true,
+              sortValue: (p) => Number(p.sale_price) || 0,
+              render: (p) => (
+                <span className="mono-num text-xs font-bold tabular-nums text-primary">
+                  ₹{p.sale_price}
+                </span>
+              ),
+            },
+            {
+              key: 'actions',
+              header: '',
+              align: 'right',
+              render: (p) => (
+                <button
+                  type="button"
+                  onClick={() => removeProduct(p.id)}
+                  className="inline-flex items-center gap-1.5 rounded-xl border border-coral-400/40 bg-coral-500/12 px-3 py-1.5 text-xs font-bold text-coral-700 transition-all hover:bg-coral-500/20 hover:text-coral-800"
+                >
+                  <TrashIcon className="h-3.5 w-3.5" />
+                  <span>Delete</span>
+                </button>
+              ),
+            },
+          ]}
+        />
       )}
     </section>
   );

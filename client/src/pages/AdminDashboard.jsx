@@ -1,35 +1,41 @@
 import { useEffect, useState } from 'react';
-import { BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, Tooltip, CartesianGrid, ResponsiveContainer, Legend } from 'recharts';
+import { Shield, TrendingUp, BarChart3, Package, Brain, Sparkles, RefreshCw, Download, Tag, Store, Trophy } from 'lucide-react';
 import api, { downloadFile } from '../api/client';
 import EmptyState from '../components/EmptyState';
 import Pagination from '../components/Pagination';
 import { Skeleton, SkeletonTable } from '../components/Skeleton';
 import CountUp from '../components/CountUp';
-import ChartTooltip from '../components/ChartTooltip';
+import RadialGauge from '../components/RadialGauge';
+import StatCard from '../components/StatCard';
+import ChartCard from '../components/ChartCard';
+import { GradientBarChart, DonutBreakdown, SERIES_COLORS } from '../components/charts';
+import DataTable from '../components/DataTable';
+import StatusPill from '../components/StatusPill';
 import { FadeIn } from '../components/Reveal';
-import { ShieldIcon, TrendingUpIcon, BarChartIcon, PackageIcon, BrainIcon, SparklesIcon, RefreshCwIcon, DownloadIcon, TagIcon } from '../components/Icons';
+import { TextGenerateEffect } from '../components/ui/text-generate-effect';
+import { GlowingStarsBackgroundCard } from '../components/ui/glowing-stars';
+import { Badge } from '../components/ui/badge';
+import { Card } from '../components/ui/card';
+import { Button } from '../components/ui/button';
 
-const CHART_COLORS = ['#7A5CC4', '#4E9C7C', '#C97354', '#5592B8', '#A184E6'];
 const fmtAgo = (s) => (s < 0 ? '—' : s < 60 ? `${Math.round(s)}s ago` : s < 3600 ? `${Math.round(s / 60)}m ago` : `${Math.round(s / 3600)}h ago`);
 const fmtDate = (s) => (s ? new Date(s).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—');
 const AUDIT_ACTIONS = ['', 'coupon.create', 'coupon.delete', 'product.create', 'product.delete', 'order.status', 'model.retrain'];
 
 const ACTION_COLORS = {
-  'coupon.create': 'bg-violet-50 text-violet-700 border-violet-200',
-  'coupon.delete': 'bg-coral-50 text-coral-700 border-coral-200',
-  'product.create': 'bg-sky-50 text-sky-700 border-sky-200',
-  'product.delete': 'bg-coral-50 text-coral-700 border-coral-200',
-  'order.status': 'bg-amber-50 text-amber-800 border-amber-200',
-  'model.retrain': 'bg-emerald-50 text-emerald-700 border-emerald-200',
+  'coupon.create': 'bg-primary/12 text-primary border-primary/25',
+  'coupon.delete': 'bg-destructive/12 text-destructive border-destructive/25',
+  'product.create': 'bg-pink-500/12 text-pink-700 border-pink-400/40',
+  'product.delete': 'bg-destructive/12 text-destructive border-destructive/25',
+  'order.status': 'bg-amber-500/12 text-amber-700 border-amber-400/40',
+  'model.retrain': 'bg-emerald-500/12 text-emerald-700 border-emerald-400/40',
 };
 
-const AXIS = { stroke: 'none', tick: { fontSize: 10, fill: '#786F97' }, axisLine: false, tickLine: false };
-const GRID = '#7A5CC414';
 const inr = (v) => `₹${Number(v).toLocaleString('en-IN')}`;
 const count = (v) => Number(v).toLocaleString('en-IN');
 
 const inputClass =
-  'w-full bg-cream-50 hover:bg-cream-50 border border-cream-300 hover:border-cream-400 rounded-xl px-3 py-2 text-xs text-cream-800 placeholder-cream-400 focus:outline-none focus:ring-2 focus:ring-violet-500/30 transition-all';
+  'w-full rounded-xl border border-input bg-card px-3 py-2 text-xs text-foreground placeholder:text-muted-foreground transition-all focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/25';
 
 export default function AdminDashboard() {
   const [data, setData] = useState(null);
@@ -45,6 +51,7 @@ export default function AdminDashboard() {
   const [auditTotal, setAuditTotal] = useState(0);
   const [auditFilter, setAuditFilter] = useState('');
   const [auditLoading, setAuditLoading] = useState(true);
+  const [userHover, setUserHover] = useState(-1);
 
   useEffect(() => {
     api.get('/dashboard/admin/summary')
@@ -129,108 +136,207 @@ export default function AdminDashboard() {
     );
   }
 
+  const couponsUsed = coupons.reduce((a, c) => a + Number(c.used_count || 0), 0);
+  const couponsLimit = coupons.reduce((a, c) => a + (Number(c.usage_limit) || 0), 0);
+  const couponUsage = couponsLimit ? Math.min(100, Math.round((couponsUsed / couponsLimit) * 100)) : 0;
+
+  const couponColumns = [
+    {
+      key: 'code',
+      header: 'Code',
+      sortable: true,
+      render: (c) => (
+        <span className="rounded-lg border border-border bg-muted px-2 py-0.5 font-mono text-xs font-extrabold text-foreground">{c.code}</span>
+      ),
+    },
+    { key: 'discount_type', header: 'Type', render: (c) => <span className="capitalize text-muted-foreground">{c.discount_type}</span> },
+    {
+      key: 'discount_value',
+      header: 'Value',
+      align: 'right',
+      sortable: true,
+      sortValue: (c) => Number(c.discount_value),
+      render: (c) => (
+        <span className="mono-num font-bold text-primary">
+          {c.discount_type === 'percent' ? `${Number(c.discount_value)}%` : `₹${Number(c.discount_value)}`}
+        </span>
+      ),
+    },
+    { key: 'min_order_value', header: 'Min Order', align: 'right', render: (c) => <span className="mono-num text-muted-foreground">₹{Number(c.min_order_value || 0)}</span> },
+    { key: 'max_discount', header: 'Max Cap', align: 'right', render: (c) => <span className="mono-num text-muted-foreground">{c.max_discount == null ? '—' : `₹${c.max_discount}`}</span> },
+    { key: 'used_count', header: 'Used / Limit', align: 'right', render: (c) => <span className="mono-num text-muted-foreground">{c.used_count} / {c.usage_limit ?? '∞'}</span> },
+    { key: 'active', header: 'Status', render: (c) => <StatusPill status={c.active ? 'active' : 'inactive'} label={c.active ? 'Active' : 'Disabled'} /> },
+    {
+      key: 'actions',
+      header: 'Actions',
+      align: 'right',
+      render: (c) => (
+        <div className="flex items-center justify-end gap-3">
+          <button type="button" onClick={() => toggleCoupon(c.id)} className="text-xs font-bold text-primary hover:text-primary/70">
+            {c.active ? 'Disable' : 'Enable'}
+          </button>
+          <button type="button" onClick={() => deleteCoupon(c.id)} className="text-xs font-bold text-destructive hover:text-destructive/70">
+            Delete
+          </button>
+        </div>
+      ),
+    },
+  ];
+
+  const topProductColumns = [
+    {
+      key: 'name',
+      header: 'Product Name',
+      render: (p) => <span className="font-bold text-foreground">{p.name}</span>,
+    },
+    { key: 'units_sold', header: 'Units Sold', align: 'right', sortable: true, render: (p) => <span className="mono-num text-muted-foreground">{p.units_sold} units</span> },
+    { key: 'revenue', header: 'Total Revenue', align: 'right', sortable: true, render: (p) => <span className="mono-num font-bold text-primary">₹{p.revenue}</span> },
+  ];
+
   return (
-    <div className="space-y-8 pb-16">
+    <div className="space-y-6 pb-16">
       {/* Header Bar */}
-      <FadeIn>
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 glass-card rounded-2xl border border-cream-300/70 shadow-elevated p-6">
-          <div className="flex items-center gap-3.5">
-            <div className="w-12 h-12 rounded-2xl bg-violet-600 flex items-center justify-center shadow-glow-brand">
-              <ShieldIcon className="w-6 h-6 text-white" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h1 className="text-xl sm:text-2xl font-extrabold text-cream-900 tracking-tight">
-                  Platform Administration
-                </h1>
-                <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-violet-50 text-violet-700 border border-violet-200">
-                  Super Admin
-                </span>
-              </div>
-              <p className="text-xs text-cream-500 mt-0.5">
-                Platform-wide analytics, ML telemetry, coupon lifecycle, and audit logs
-              </p>
-            </div>
-          </div>
-
-          {/* Platform Reports Quick Export */}
-          <div className="flex flex-wrap items-center gap-1.5 bg-cream-100 p-1.5 rounded-2xl border border-cream-300/70">
-            {[
-              ['sales/csv', 'Sales CSV'],
-              ['sales/pdf', 'Sales PDF'],
-              ['inventory/csv', 'Inv CSV'],
-              ['inventory/pdf', 'Inv PDF']
-            ].map(([path, label]) => (
-              <button
-                key={path}
-                onClick={() => downloadFile(`/reports/${path}`, label.replace(/\s/g, '-').toLowerCase() + '-platform')}
-                className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-cream-50 hover:bg-cream-100 text-cream-700 border border-cream-300/70 text-[11px] font-bold transition-all hover:-translate-y-0.5 hover:shadow-subtle"
-                title={`Export Platform ${label}`}
-              >
-                <DownloadIcon className="w-3 h-3 text-cream-400" />
-                <span>{label}</span>
-              </button>
-            ))}
-          </div>
-        </div>
-      </FadeIn>
-
-      {/* KPI Stat Cards */}
-      <FadeIn>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
-          <StatCard
-            label="Platform Revenue"
-            value={<CountUp value={Number(data?.totals?.platform_revenue || 0)} prefix="₹" />}
-            icon={TrendingUpIcon}
-            tint="text-violet-600 bg-violet-50 border-violet-200"
-          />
-          <StatCard
-            label="Platform Net Profit"
-            value={<CountUp value={Number(data?.totals?.platform_profit || 0)} prefix="₹" />}
-            icon={BarChartIcon}
-            tint="text-emerald-600 bg-emerald-50 border-emerald-200"
-          />
-          <StatCard
-            label="Total Platform Orders"
-            value={<CountUp value={data?.totals?.total_orders || 0} />}
-            icon={PackageIcon}
-            tint="text-sky-600 bg-sky-50 border-sky-200"
-          />
-        </div>
-      </FadeIn>
-
-      {/* 🧠 Machine Learning Model Health Panel */}
-      <FadeIn>
-        <section className="glass-card rounded-2xl border border-cream-300/70 shadow-subtle p-6 sm:p-8 space-y-6">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-cream-300/70 pb-4">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold border border-emerald-200">
-                <BrainIcon className="w-5 h-5" />
+      <FadeIn y={12}>
+        <Card className="relative gap-0 overflow-hidden p-5 sm:p-6">
+          <div aria-hidden className="pointer-events-none absolute -right-16 -top-24 size-64 rounded-full bg-[radial-gradient(circle,rgba(139,92,246,0.18),transparent_65%)]" />
+          <div className="relative flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-center gap-3.5">
+              <div className="grid size-12 place-items-center rounded-2xl bg-gradient-to-br from-primary via-[#ec4899] to-[#f97316] font-extrabold text-white shadow-glow-brand">
+                <Shield className="size-6" />
               </div>
               <div>
                 <div className="flex items-center gap-2">
-                  <h2 className="text-base sm:text-lg font-extrabold text-cream-900 tracking-tight">
-                    ML Model Registry & Telemetry
-                  </h2>
-                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-violet-50 text-violet-700 border border-violet-200">
-                    Joblib Persistent Store
-                  </span>
+                  <h1 className="text-xl font-extrabold tracking-tight text-foreground sm:text-2xl">
+                    <TextGenerateEffect words="Platform Administration" className="text-xl font-extrabold tracking-tight text-foreground sm:text-2xl" />
+                  </h1>
+                  <Badge variant="secondary" className="rounded-full border border-primary/25 bg-primary/12 px-2.5 py-0.5 text-[10px] font-bold text-primary">
+                    Super Admin
+                  </Badge>
                 </div>
-                <p className="text-xs text-cream-500 mt-0.5">
+                <p className="mt-0.5 text-xs text-muted-foreground">
+                  Platform-wide analytics, ML telemetry, coupon lifecycle, and audit logs
+                </p>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-1.5 rounded-2xl border border-border bg-muted/40 p-1.5">
+              {[
+                ['sales/csv', 'Sales CSV'],
+                ['sales/pdf', 'Sales PDF'],
+                ['inventory/csv', 'Inv CSV'],
+                ['inventory/pdf', 'Inv PDF']
+              ].map(([path, label]) => (
+                <button
+                  key={path}
+                  onClick={() => downloadFile(`/reports/${path}`, label.replace(/\s/g, '-').toLowerCase() + '-platform')}
+                  className="inline-flex items-center gap-1 rounded-xl border border-border bg-card px-2.5 py-1.5 text-[11px] font-bold text-muted-foreground transition-colors hover:border-primary/40 hover:text-primary"
+                  title={`Export Platform ${label}`}
+                >
+                  <Download className="size-3" />
+                  <span>{label}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        </Card>
+      </FadeIn>
+
+      {/* KPI Stat Cards */}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <StatCard label="Platform Revenue" value={Number(data?.totals?.platform_revenue || 0)} prefix="₹" icon={TrendingUp} accent="primary" hint="Gross merchandise value" />
+        <StatCard label="Platform Net Profit" value={Number(data?.totals?.platform_profit || 0)} prefix="₹" icon={BarChart3} accent="emerald" hint="After fulfillment costs" delay={0.05} />
+        <StatCard label="Total Platform Orders" value={Number(data?.totals?.total_orders || 0)} icon={Package} accent="cyan" hint="Across all storefronts" delay={0.1} />
+      </div>
+
+      {/* Analytics Charts Grid */}
+      <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+        <FadeIn>
+          <ChartCard
+            title="Platform Revenue by Storefront"
+            subtitle="Gross revenue contributed by each retail partner"
+            icon={Store}
+            accent="primary"
+            right={
+              <Badge variant="outline" className="rounded-full border-border bg-muted/40 text-[10px] font-semibold text-muted-foreground">
+                Retail Partners
+              </Badge>
+            }
+          >
+            {data?.byRetailer?.length === 0 ? (
+              <EmptyState icon="📊" title="No revenue data" message="Store revenues will appear here once transactions occur." />
+            ) : (
+              <GradientBarChart
+                data={data?.byRetailer}
+                xKey="store_name"
+                valueFormatter={inr}
+                height={264}
+                series={[{ key: 'revenue', label: 'Store Revenue (₹)', color: '#8B5CF6' }]}
+              />
+            )}
+          </ChartCard>
+        </FadeIn>
+
+        <FadeIn delay={0.05}>
+          <ChartCard
+            title="Platform User Distribution"
+            subtitle="Registered accounts by role"
+            icon={Package}
+            accent="cyan"
+            right={
+              <Badge variant="outline" className="rounded-full border-border bg-muted/40 text-[10px] font-semibold text-muted-foreground">
+                Registered Accounts
+              </Badge>
+            }
+          >
+            {data?.userCounts?.length === 0 ? (
+              <EmptyState icon="👥" title="No users registered yet" />
+            ) : (
+              <DonutBreakdown
+                data={(data?.userCounts || []).map((u) => ({ name: u.role, value: u.count }))}
+                valueFormatter={count}
+                height={264}
+                colors={SERIES_COLORS}
+                hoverIndex={userHover}
+                onHover={setUserHover}
+              />
+            )}
+          </ChartCard>
+        </FadeIn>
+      </div>
+
+      {/* ML Model Health Panel */}
+      <FadeIn>
+        <GlowingStarsBackgroundCard>
+          <div className="space-y-6 p-5 sm:p-6">
+          <div className="flex flex-col gap-3 border-b border-border pb-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-center gap-3">
+              <div className="grid size-10 place-items-center rounded-2xl border border-emerald-400/40 bg-emerald-500/12 text-emerald-700">
+                <Brain className="size-5" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h2 className="text-base font-bold tracking-tight text-foreground sm:text-lg">
+                    ML Model Registry &amp; Telemetry
+                  </h2>
+                  <Badge variant="outline" className="rounded-full border-primary/25 bg-primary/12 text-[10px] font-bold text-primary">
+                    Joblib Persistent Store
+                  </Badge>
+                </div>
+                <p className="mt-0.5 text-xs text-muted-foreground">
                   Evaluates holdout MAE and precision@k metrics; lazy 12-hour TTL cache refresh
                 </p>
               </div>
             </div>
 
-            <button
+            <Button
               type="button"
               onClick={retrain}
               disabled={retraining}
-              className="inline-flex items-center justify-center gap-2 bg-violet-600 hover:bg-violet-500 text-white text-xs font-bold px-4 py-2.5 rounded-xl shadow-glow-brand transition-all hover:-translate-y-0.5 disabled:opacity-50"
+              className="gap-2 rounded-xl text-xs font-bold"
             >
-              <RefreshCwIcon className={`w-3.5 h-3.5 ${retraining ? 'animate-spin' : ''}`} />
-              <span>{retraining ? 'Re-training Models…' : 'Force Re-train All'}</span>
-            </button>
+              <RefreshCw className={`size-3.5 ${retraining ? 'animate-spin' : ''}`} />
+              {retraining ? 'Re-training Models…' : 'Force Re-train All'}
+            </Button>
           </div>
 
           {!health ? (
@@ -238,35 +344,35 @@ export default function AdminDashboard() {
           ) : (
             <ModelHealth health={health} />
           )}
-        </section>
+          </div>
+        </GlowingStarsBackgroundCard>
       </FadeIn>
 
-      {/* 🎟️ Coupon Management Section */}
+      {/* Coupon Management Section */}
       <FadeIn>
-        <section className="glass-card rounded-2xl border border-cream-300/70 shadow-subtle p-6 sm:p-8 space-y-6">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-cream-300/70 pb-4">
+        <Card className="gap-0 space-y-6 p-5 sm:p-6">
+          <div className="flex flex-col gap-2 border-b border-border pb-4 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-center gap-2.5">
-              <div className="w-9 h-9 rounded-2xl bg-violet-50 text-violet-600 flex items-center justify-center border border-violet-200">
-                <TagIcon className="w-4 h-4" />
+              <div className="grid size-9 place-items-center rounded-2xl border border-primary/25 bg-primary/12 text-primary">
+                <Tag className="size-4" />
               </div>
               <div>
-                <h2 className="font-extrabold text-cream-900 text-base sm:text-lg">Promotions & Coupons</h2>
-                <p className="text-xs text-cream-500">Manage promotional discount codes across platform orders</p>
+                <h2 className="text-base font-bold text-foreground sm:text-lg">Promotions &amp; Coupons</h2>
+                <p className="text-xs text-muted-foreground">Manage promotional discount codes across platform orders</p>
               </div>
             </div>
             {couponMsg && (
-              <span className={`text-xs font-semibold px-3 py-1 rounded-xl border ${
-                couponMsg.includes('success') ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-coral-50 text-coral-700 border-coral-200'
+              <span className={`rounded-xl border px-3 py-1 text-xs font-semibold ${
+                couponMsg.includes('success') ? 'border-emerald-400/40 bg-emerald-500/12 text-emerald-700' : 'border-destructive/25 bg-destructive/10 text-destructive'
               }`}>
                 {couponMsg}
               </span>
             )}
           </div>
 
-          {/* Create Coupon Form */}
-          <form onSubmit={createCoupon} className="bg-cream-50 border border-cream-300/70 rounded-2xl p-5 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
+          <form onSubmit={createCoupon} className="grid grid-cols-1 gap-3.5 rounded-2xl border border-border bg-muted/30 p-5 sm:grid-cols-2 lg:grid-cols-4">
             <div>
-              <label className="block text-[10px] font-bold uppercase tracking-wider text-cream-500 mb-1">Code *</label>
+              <label className="label-micro mb-1 block text-primary">Code *</label>
               <input
                 required
                 placeholder="e.g. SAVE20"
@@ -277,7 +383,7 @@ export default function AdminDashboard() {
             </div>
 
             <div>
-              <label className="block text-[10px] font-bold uppercase tracking-wider text-cream-500 mb-1">Description</label>
+              <label className="label-micro mb-1 block">Description</label>
               <input
                 placeholder="e.g. Summer special 20% off"
                 value={couponForm.description}
@@ -287,11 +393,11 @@ export default function AdminDashboard() {
             </div>
 
             <div>
-              <label className="block text-[10px] font-bold uppercase tracking-wider text-cream-500 mb-1">Type</label>
+              <label className="label-micro mb-1 block">Type</label>
               <select
                 value={couponForm.discount_type}
                 onChange={(e) => setCouponForm({ ...couponForm, discount_type: e.target.value })}
-                className={`${inputClass} font-bold cursor-pointer`}
+                className={`${inputClass} cursor-pointer font-bold`}
               >
                 <option value="percent">Percent Discount (%)</option>
                 <option value="flat">Flat Amount (₹)</option>
@@ -299,7 +405,7 @@ export default function AdminDashboard() {
             </div>
 
             <div>
-              <label className="block text-[10px] font-bold uppercase tracking-wider text-cream-500 mb-1">Discount Value *</label>
+              <label className="label-micro mb-1 block">Discount Value *</label>
               <input
                 required
                 type="number"
@@ -313,7 +419,7 @@ export default function AdminDashboard() {
             </div>
 
             <div>
-              <label className="block text-[10px] font-bold uppercase tracking-wider text-cream-500 mb-1">Min Order Value (₹)</label>
+              <label className="label-micro mb-1 block">Min Order Value (₹)</label>
               <input
                 type="number"
                 min="0"
@@ -325,7 +431,7 @@ export default function AdminDashboard() {
             </div>
 
             <div>
-              <label className="block text-[10px] font-bold uppercase tracking-wider text-cream-500 mb-1">Max Discount Cap (₹)</label>
+              <label className="label-micro mb-1 block">Max Discount Cap (₹)</label>
               <input
                 type="number"
                 min="0"
@@ -337,7 +443,7 @@ export default function AdminDashboard() {
             </div>
 
             <div>
-              <label className="block text-[10px] font-bold uppercase tracking-wider text-cream-500 mb-1">Usage Limit</label>
+              <label className="label-micro mb-1 block">Usage Limit</label>
               <input
                 type="number"
                 min="0"
@@ -349,101 +455,69 @@ export default function AdminDashboard() {
             </div>
 
             <div className="flex items-end">
-              <button
-                type="submit"
-                className="w-full bg-violet-600 hover:bg-violet-500 text-white text-xs font-bold py-2.5 px-4 rounded-xl shadow-glow-brand transition-all hover:-translate-y-0.5"
-              >
+              <Button type="submit" className="w-full rounded-xl text-xs font-bold">
                 + Create Coupon
-              </button>
+              </Button>
             </div>
           </form>
 
-          {/* Coupons Table */}
+          {coupons.length > 0 && (
+            <div className="flex flex-wrap items-center gap-5 rounded-2xl border border-border bg-muted/30 p-4">
+              <RadialGauge id="couponUse" value={couponUsage} size={120} stroke={11} from="#F59E0B" to="#EC4899" track="#EDE3D5" glow={false}>
+                <div className="text-center">
+                  <div className="mono-num text-2xl font-black tabular-nums text-foreground">
+                    <CountUp value={couponUsage} />
+                    <span className="text-sm text-muted-foreground">%</span>
+                  </div>
+                  <p className="text-[9px] font-bold uppercase tracking-[0.16em] text-muted-foreground">Redeemed</p>
+                </div>
+              </RadialGauge>
+              <div>
+                <p className="label-micro text-primary">Coupon Utilization</p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {couponsUsed} of {couponsLimit || '∞'} tracked redemptions across {coupons.length} codes
+                </p>
+              </div>
+            </div>
+          )}
+
           {coupons.length === 0 ? (
             <EmptyState icon="🎟️" title="No coupons issued" message="Create your first promotional discount above." />
           ) : (
-            <div className="overflow-x-auto rounded-2xl border border-cream-300/70">
-              <table className="w-full text-xs text-left">
-                <thead className="bg-cream-100 border-b border-cream-300/70 text-cream-500 font-bold uppercase tracking-wider text-[10px]">
-                  <tr>
-                    <th className="p-3 sm:p-3.5">Code</th>
-                    <th className="p-3 sm:p-3.5">Type</th>
-                    <th className="p-3 sm:p-3.5">Value</th>
-                    <th className="p-3 sm:p-3.5">Min Order</th>
-                    <th className="p-3 sm:p-3.5">Max Cap</th>
-                    <th className="p-3 sm:p-3.5">Used / Limit</th>
-                    <th className="p-3 sm:p-3.5">Status</th>
-                    <th className="p-3 sm:p-3.5 text-right">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-cream-300/60 font-medium">
-                  {coupons.map((c) => (
-                    <tr key={c.id} className="hover:bg-cream-50 transition-colors">
-                      <td className="p-3 sm:p-3.5">
-                        <span className="font-mono font-extrabold px-2 py-0.5 rounded-lg bg-cream-100 text-cream-800 border border-cream-300/70">
-                          {c.code}
-                        </span>
-                      </td>
-                      <td className="p-3 sm:p-3.5 capitalize text-cream-700">{c.discount_type}</td>
-                      <td className="p-3 sm:p-3.5 font-bold text-violet-700">
-                        {c.discount_type === 'percent' ? `${Number(c.discount_value)}%` : `₹${Number(c.discount_value)}`}
-                      </td>
-                      <td className="p-3 sm:p-3.5 text-cream-700">₹{Number(c.min_order_value || 0)}</td>
-                      <td className="p-3 sm:p-3.5 text-cream-700">{c.max_discount == null ? '—' : `₹${c.max_discount}`}</td>
-                      <td className="p-3 sm:p-3.5 font-mono text-cream-700">{c.used_count} / {c.usage_limit ?? '∞'}</td>
-                      <td className="p-3 sm:p-3.5">
-                        <span className={`inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full border ${
-                          c.active ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-cream-100 text-cream-500 border-cream-300/70'
-                        }`}>
-                          <span className={`w-1.5 h-1.5 rounded-full ${c.active ? 'bg-emerald-500' : 'bg-cream-400'}`} />
-                          {c.active ? 'Active' : 'Disabled'}
-                        </span>
-                      </td>
-                      <td className="p-3 sm:p-3.5 text-right space-x-2 whitespace-nowrap">
-                        <button
-                          type="button"
-                          onClick={() => toggleCoupon(c.id)}
-                          className="text-xs font-bold text-violet-700 hover:text-violet-600 underline"
-                        >
-                          {c.active ? 'Disable' : 'Enable'}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => deleteCoupon(c.id)}
-                          className="text-xs font-bold text-coral-700 hover:text-coral-600 underline"
-                        >
-                          Delete
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <DataTable
+              columns={couponColumns}
+              rows={coupons}
+              searchable
+              searchKeys={['code', 'description']}
+              searchPlaceholder="Search coupons…"
+              initialSort={{ key: 'code', dir: 'asc' }}
+              pageSize={8}
+              className="border-0 shadow-none"
+            />
           )}
-        </section>
+        </Card>
       </FadeIn>
 
-      {/* 📜 Admin Audit Log Section */}
+      {/* Admin Audit Log Section */}
       <FadeIn>
-        <section className="glass-card rounded-2xl border border-cream-300/70 shadow-subtle p-6 sm:p-8 space-y-6">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-cream-300/70 pb-4">
+        <Card className="gap-0 space-y-6 p-5 sm:p-6">
+          <div className="flex flex-col gap-3 border-b border-border pb-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <div className="flex items-center gap-2">
-                <h2 className="font-extrabold text-cream-900 text-base sm:text-lg">Security & Operational Audit Log</h2>
-                <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-cream-100 text-cream-700 border border-cream-300/70">
+                <h2 className="text-base font-bold text-foreground sm:text-lg">Security &amp; Operational Audit Log</h2>
+                <Badge variant="outline" className="rounded-full border-border bg-muted text-[10px] font-bold text-muted-foreground">
                   {auditTotal} event{auditTotal === 1 ? '' : 's'}
-                </span>
+                </Badge>
               </div>
-              <p className="text-xs text-cream-500 mt-0.5">Immutable audit trail of administrator and system mutation actions</p>
+              <p className="mt-0.5 text-xs text-muted-foreground">Immutable audit trail of administrator and system mutation actions</p>
             </div>
 
             <div className="flex items-center gap-2">
-              <span className="text-xs font-bold text-cream-500">Filter action:</span>
+              <span className="text-xs font-bold text-muted-foreground">Filter action:</span>
               <select
                 value={auditFilter}
                 onChange={(e) => setAuditFilter(e.target.value)}
-                className="bg-cream-50 border border-cream-300 rounded-xl px-3 py-1.5 text-xs font-semibold text-cream-800 hover:bg-cream-50 focus:outline-none focus:ring-2 focus:ring-violet-500/30 cursor-pointer"
+                className="cursor-pointer rounded-xl border border-input bg-card px-3 py-1.5 text-xs font-semibold text-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/25"
                 aria-label="Filter audit log by action"
               >
                 {AUDIT_ACTIONS.map((a) => (
@@ -463,49 +537,42 @@ export default function AdminDashboard() {
             />
           ) : (
             <div className="space-y-4">
-              <div className="overflow-x-auto rounded-2xl border border-cream-300/70">
-                <table className="w-full text-xs text-left">
-                  <thead className="bg-cream-100 border-b border-cream-300/70 text-cream-500 font-bold uppercase tracking-wider text-[10px]">
-                    <tr>
-                      <th className="p-3 sm:p-3.5">Timestamp</th>
-                      <th className="p-3 sm:p-3.5">Actor</th>
-                      <th className="p-3 sm:p-3.5">Role</th>
-                      <th className="p-3 sm:p-3.5">Action</th>
-                      <th className="p-3 sm:p-3.5">Target Entity</th>
-                      <th className="p-3 sm:p-3.5">Payload Details</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-cream-300/60 font-medium">
-                    {audit.map((e) => (
-                      <tr key={e.id} className="hover:bg-cream-50 transition-colors">
-                        <td className="p-3 sm:p-3.5 whitespace-nowrap text-cream-500 font-mono text-[11px]">
-                          {fmtDate(e.created_at)}
-                        </td>
-                        <td className="p-3 sm:p-3.5 font-bold text-cream-900">
-                          {e.actor_name || `#${e.actor_id}`}
-                        </td>
-                        <td className="p-3 sm:p-3.5">
-                          <span className="inline-block px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-cream-100 text-cream-700 border border-cream-300/70">
-                            {e.actor_role}
-                          </span>
-                        </td>
-                        <td className="p-3 sm:p-3.5">
-                          <span className={`inline-block px-2 py-0.5 rounded-lg font-mono text-[11px] font-bold border ${
-                            ACTION_COLORS[e.action] || 'bg-cream-100 text-cream-700 border-cream-300/70'
-                          }`}>
-                            {e.action}
-                          </span>
-                        </td>
-                        <td className="p-3 sm:p-3.5 text-cream-700 font-medium">
-                          {e.entity_type} {e.entity_id != null ? `#${e.entity_id}` : ''}
-                        </td>
-                        <td className="p-3 sm:p-3.5 text-cream-500 font-mono text-[11px] max-w-xs truncate">
-                          {JSON.stringify(e.details || {})}
-                        </td>
+              <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-card">
+                <div className="overflow-x-auto">
+                  <table className="w-full min-w-[820px] border-collapse text-left text-xs">
+                    <thead className="sticky top-0 z-10">
+                      <tr className="border-b border-border bg-muted/50 backdrop-blur">
+                        {['Timestamp', 'Actor', 'Role', 'Action', 'Target Entity', 'Payload Details'].map((h, i) => (
+                          <th key={h} className={`px-4 py-3 text-[10px] font-bold uppercase tracking-[0.12em] text-muted-foreground ${i === 5 ? 'text-right' : ''}`}>{h}</th>
+                        ))}
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody>
+                      {audit.map((e) => (
+                        <tr key={e.id} className="border-b border-border/60 transition-colors last:border-0 hover:bg-primary/[0.055]">
+                          <td className="whitespace-nowrap px-4 py-3 font-mono text-[11px] text-muted-foreground">{fmtDate(e.created_at)}</td>
+                          <td className="px-4 py-3 font-bold text-foreground">{e.actor_name || `#${e.actor_id}`}</td>
+                          <td className="px-4 py-3">
+                            <span className="inline-block rounded-full border border-border bg-muted px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                              {e.actor_role}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3">
+                            <span className={`inline-block rounded-lg border px-2 py-0.5 font-mono text-[11px] font-bold ${ACTION_COLORS[e.action] || 'border-border bg-muted text-muted-foreground'}`}>
+                              {e.action}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 font-medium text-muted-foreground">
+                            {e.entity_type} {e.entity_id != null ? `#${e.entity_id}` : ''}
+                          </td>
+                          <td className="max-w-xs truncate px-4 py-3 text-right font-mono text-[11px] text-muted-foreground">
+                            {JSON.stringify(e.details || {})}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
 
               {auditPages > 1 && (
@@ -513,106 +580,32 @@ export default function AdminDashboard() {
               )}
             </div>
           )}
-        </section>
+        </Card>
       </FadeIn>
-
-      {/* Analytics Charts Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* Revenue by Retailer */}
-        <FadeIn>
-          <div className="glass-card rounded-2xl border border-cream-300/70 shadow-subtle p-6 space-y-4">
-            <div className="flex items-center justify-between">
-              <h3 className="font-bold text-sm text-cream-900">Platform Revenue by Storefront</h3>
-              <span className="text-[11px] text-cream-400 font-semibold uppercase">Retail Partners</span>
-            </div>
-            {data?.byRetailer?.length === 0 ? (
-              <EmptyState icon="📊" title="No revenue data" message="Store revenues will appear here once transactions occur." />
-            ) : (
-              <div className="h-64 w-full">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={data?.byRetailer} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke={GRID} />
-                    <XAxis dataKey="store_name" {...AXIS} tick={{ fontSize: 9, fill: '#786F97' }} />
-                    <YAxis {...AXIS} />
-                    <Tooltip content={<ChartTooltip format={inr} />} cursor={{ fill: '#7A5CC410' }} />
-                    <Bar dataKey="revenue" fill="#4E9C7C" radius={[3, 3, 0, 0]} name="Store Revenue (₹)" />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            )}
-          </div>
-        </FadeIn>
-
-        {/* Users by Role */}
-        <FadeIn>
-          <div className="glass-card rounded-2xl border border-cream-300/70 shadow-subtle p-6 space-y-4">
-            <div className="flex items-center justify-between">
-              <h3 className="font-bold text-sm text-cream-900">Platform User Distribution</h3>
-              <span className="text-[11px] text-cream-400 font-semibold uppercase">Registered Accounts</span>
-            </div>
-            {data?.userCounts?.length === 0 ? (
-              <EmptyState icon="👥" title="No users registered yet" />
-            ) : (
-              <div className="h-64 w-full">
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie
-                      data={data?.userCounts}
-                      dataKey="count"
-                      nameKey="role"
-                      innerRadius={55}
-                      outerRadius={85}
-                      paddingAngle={3}
-                      stroke="#F0EDFA"
-                    >
-                      {data?.userCounts?.map((entry, index) => (
-                        <Cell key={index} fill={CHART_COLORS[index % CHART_COLORS.length]} />
-                      ))}
-                    </Pie>
-                    <Tooltip content={<ChartTooltip format={count} />} />
-                    <Legend wrapperStyle={{ fontSize: '11px', paddingTop: '8px', color: '#786F97' }} formatter={(v) => <span style={{ color: '#786F97' }}>{v}</span>} />
-                  </PieChart>
-                </ResponsiveContainer>
-              </div>
-            )}
-          </div>
-        </FadeIn>
-      </div>
 
       {/* Top Products Platform-Wide Table */}
       <section className="space-y-4">
         <FadeIn>
-          <div>
-            <h3 className="font-bold text-cream-900 text-base">Top Performing Products (Platform-Wide)</h3>
-            <p className="text-xs text-cream-500">Total volume and revenue across all affiliated retailer inventory</p>
+          <div className="flex items-center gap-2.5">
+            <span className="grid size-9 place-items-center rounded-xl bg-gradient-to-br from-amber-500/25 to-orange-500/10 text-amber-700 ring-1 ring-amber-400/40">
+              <Trophy className="size-4" />
+            </span>
+            <div>
+              <h3 className="text-base font-bold tracking-tight text-foreground">Top Performing Products</h3>
+              <p className="text-xs text-muted-foreground">Total volume and revenue across all affiliated retailer inventory</p>
+            </div>
           </div>
         </FadeIn>
 
         {data?.topProductsPlatform?.length === 0 ? (
           <EmptyState icon="🏆" title="No platform sales recorded yet" />
         ) : (
-          <div className="glass-card rounded-2xl border border-cream-300/70 shadow-subtle overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full text-xs sm:text-sm text-left">
-                <thead className="bg-cream-100 border-b border-cream-300/70 text-cream-500 font-bold uppercase tracking-wider text-[10px]">
-                  <tr>
-                    <th className="p-3.5 sm:p-4">Product Name</th>
-                    <th className="p-3.5 sm:p-4">Units Sold</th>
-                    <th className="p-3.5 sm:p-4">Total Revenue</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-cream-300/60 font-medium">
-                  {data?.topProductsPlatform?.map((p, idx) => (
-                    <tr key={idx} className="hover:bg-cream-50 transition-colors">
-                      <td className="p-3.5 sm:p-4 font-bold text-cream-900">{p.name}</td>
-                      <td className="p-3.5 sm:p-4 font-mono font-bold text-cream-700">{p.units_sold} units</td>
-                      <td className="p-3.5 sm:p-4 font-mono font-bold text-violet-700">₹{p.revenue}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
+          <DataTable
+            columns={topProductColumns}
+            rows={data?.topProductsPlatform || []}
+            initialSort={{ key: 'revenue', dir: 'desc' }}
+            pageSize={8}
+          />
         )}
       </section>
     </div>
@@ -621,12 +614,12 @@ export default function AdminDashboard() {
 
 function MetricChip({ label, value, fresh }) {
   return (
-    <div className="rounded-2xl border border-cream-300/70 p-3.5 bg-cream-50">
-      <p className="text-[10px] text-cream-500 font-bold uppercase tracking-wider">{label}</p>
-      <p className="text-sm sm:text-base font-extrabold text-cream-900 mt-0.5 tabular-nums">{value}</p>
+    <div className="rounded-2xl border border-border bg-card p-3.5 shadow-subtle">
+      <p className="label-micro">{label}</p>
+      <p className="mono-num mt-0.5 text-sm font-extrabold tabular-nums text-foreground sm:text-base">{value}</p>
       {fresh != null && (
-        <p className={`text-[10px] font-bold mt-1 flex items-center gap-1 ${fresh ? 'text-emerald-700' : 'text-amber-800'}`}>
-          <span className={`w-1.5 h-1.5 rounded-full ${fresh ? 'bg-emerald-500' : 'bg-amber-500'}`} />
+        <p className={`mt-1 flex items-center gap-1 text-[10px] font-bold ${fresh ? 'text-emerald-700' : 'text-amber-700'}`}>
+          <span className={`status-dot size-1.5 text-current ${fresh ? 'bg-emerald-500' : 'bg-amber-500'}`} />
           {fresh ? 'Fresh Artifact' : 'Retrain Stale Due'}
         </p>
       )}
@@ -636,68 +629,75 @@ function MetricChip({ label, value, fresh }) {
 
 function ModelHealth({ health }) {
   const { recommend, demand, max_age_seconds } = health;
+  const models = [recommend, ...(demand.models || [])];
+  const freshCount = models.filter((m) => m?.fresh).length;
+  const freshPct = models.length ? Math.round((freshCount / models.length) * 100) : 0;
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-      {/* Recommend Model */}
-      <div className="space-y-3">
-        <div className="flex items-center justify-between">
-          <p className="text-xs font-bold text-cream-800 uppercase tracking-wider flex items-center gap-1.5">
-            <SparklesIcon className="w-3.5 h-3.5 text-violet-600" />
-            Recommendation Engine
-          </p>
-          <span className="text-[10px] font-semibold text-cream-400">Cosine Interaction Matrix</span>
-        </div>
-        <div className="grid grid-cols-2 gap-2.5">
-          <MetricChip label="Precision@K (Eval)" value={recommend.metrics?.precision_at_k ?? '—'} fresh={recommend.fresh} />
-          <MetricChip label="Evaluated Users" value={recommend.metrics?.eval_customers ?? '—'} />
-          <MetricChip label="Model Age" value={fmtAgo(recommend.age_seconds)} fresh={recommend.fresh} />
-          <MetricChip label="Matrix Shape" value={`${recommend.meta?.customers ?? '—'} u × ${recommend.meta?.products ?? '—'} p`} />
-        </div>
-      </div>
-
-      {/* Demand Model */}
-      <div className="space-y-3">
-        <div className="flex items-center justify-between">
-          <p className="text-xs font-bold text-cream-800 uppercase tracking-wider flex items-center gap-1.5">
-            <TrendingUpIcon className="w-3.5 h-3.5 text-emerald-600" />
-            Demand Forecast Regressors
-          </p>
-          <span className="text-[10px] font-semibold text-cream-400">7-Day Horizon Horizon</span>
-        </div>
-        <div className="grid grid-cols-2 gap-2.5">
-          <MetricChip label="Retailer Models" value={demand.models?.length ?? 0} />
-          <MetricChip label="Holdout MAE (Units)" value={demand.models?.[0]?.metrics?.mae ?? '—'} fresh={demand.models?.[0]?.fresh} />
-          <MetricChip label="Model Age" value={fmtAgo(demand.models?.[0]?.age_seconds)} fresh={demand.models?.[0]?.fresh} />
-          <MetricChip label="Freshness TTL" value={`${(max_age_seconds || 43200) / 3600} Hours`} />
-        </div>
-        {demand.models?.length > 0 && (
-          <div className="pt-1 flex flex-wrap gap-1.5">
-            {demand.models.map((m) => (
-              <span
-                key={m.retailer_id}
-                className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
-                  m.fresh ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-amber-50 text-amber-800 border-amber-200'
-                }`}
-              >
-                Store #{m.retailer_id} · MAE {m.metrics?.mae ?? '—'} · {fmtAgo(m.age_seconds)}
-              </span>
-            ))}
+    <div className="space-y-6">
+      <div className="flex flex-wrap items-center gap-5 rounded-2xl border border-border bg-muted/30 p-4">
+        <RadialGauge id="modelFresh" value={freshPct} size={120} stroke={11} from="#10B981" to="#14B8A6" track="#EDE3D5">
+          <div className="text-center">
+            <div className="mono-num text-2xl font-black tabular-nums text-foreground">
+              <CountUp value={freshPct} />
+              <span className="text-sm text-muted-foreground">%</span>
+            </div>
+            <p className="text-[9px] font-bold uppercase tracking-[0.16em] text-muted-foreground">Fresh</p>
           </div>
-        )}
+        </RadialGauge>
+        <div>
+          <p className="label-micro text-primary">Model Freshness</p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            {freshCount} of {models.length} artifacts within {(max_age_seconds || 43200) / 3600}h TTL
+          </p>
+        </div>
       </div>
-    </div>
-  );
-}
 
-function StatCard({ label, value, icon: Icon, tint }) {
-  return (
-    <div className="glass-card rounded-2xl border border-cream-300/70 shadow-subtle p-5 sm:p-6 flex items-center justify-between hover:border-cream-300 hover:-translate-y-0.5 transition-all duration-300">
-      <div>
-        <p className="label-micro">{label}</p>
-        <p className="font-serif font-bold text-2xl sm:text-3xl text-cream-900 mt-1 tabular-nums leading-none">{value}</p>
-      </div>
-      <div className={`w-12 h-12 rounded-2xl ${tint} border flex items-center justify-center flex-shrink-0`}>
-        <Icon className="w-6 h-6" />
+      <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <p className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-foreground">
+              <Sparkles className="size-3.5 text-primary" />
+              Recommendation Engine
+            </p>
+            <span className="text-[10px] font-semibold text-muted-foreground">Cosine Interaction Matrix</span>
+          </div>
+          <div className="grid grid-cols-2 gap-2.5">
+            <MetricChip label="Precision@K (Eval)" value={recommend.metrics?.precision_at_k ?? '—'} fresh={recommend.fresh} />
+            <MetricChip label="Evaluated Users" value={recommend.metrics?.eval_customers ?? '—'} />
+            <MetricChip label="Model Age" value={fmtAgo(recommend.age_seconds)} fresh={recommend.fresh} />
+            <MetricChip label="Matrix Shape" value={`${recommend.meta?.customers ?? '—'} u × ${recommend.meta?.products ?? '—'} p`} />
+          </div>
+        </div>
+
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <p className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-foreground">
+              <TrendingUp className="size-3.5 text-emerald-700" />
+              Demand Forecast Regressors
+            </p>
+            <span className="text-[10px] font-semibold text-muted-foreground">7-Day Horizon</span>
+          </div>
+          <div className="grid grid-cols-2 gap-2.5">
+            <MetricChip label="Retailer Models" value={demand.models?.length ?? 0} />
+            <MetricChip label="Holdout MAE (Units)" value={demand.models?.[0]?.metrics?.mae ?? '—'} fresh={demand.models?.[0]?.fresh} />
+            <MetricChip label="Model Age" value={fmtAgo(demand.models?.[0]?.age_seconds)} fresh={demand.models?.[0]?.fresh} />
+            <MetricChip label="Freshness TTL" value={`${(max_age_seconds || 43200) / 3600} Hours`} />
+          </div>
+          {demand.models?.length > 0 && (
+            <div className="flex flex-wrap gap-1.5 pt-1">
+              {demand.models.map((m) => (
+                <span
+                  key={m.retailer_id}
+                  className={`rounded-full border px-2 py-0.5 text-[10px] font-bold ${
+                    m.fresh ? 'border-emerald-400/40 bg-emerald-500/12 text-emerald-700' : 'border-amber-400/40 bg-amber-500/12 text-amber-700'
+                  }`}
+                >
+                  Store #{m.retailer_id} · MAE {m.metrics?.mae ?? '—'} · {fmtAgo(m.age_seconds)}
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -705,13 +705,13 @@ function StatCard({ label, value, icon: Icon, tint }) {
 
 function AdminLoading() {
   return (
-    <div className="space-y-8">
-      <Skeleton className="h-12 w-72 rounded-2xl" />
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
+    <div className="space-y-6">
+      <Skeleton className="h-28 w-full rounded-3xl" />
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         {[1, 2, 3].map((i) => <Skeleton key={i} className="h-28 rounded-2xl" />)}
       </div>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {[1, 2].map((i) => <Skeleton key={i} className="h-72 rounded-2xl" />)}
+      <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+        {[1, 2].map((i) => <Skeleton key={i} className="h-80 rounded-2xl" />)}
       </div>
       <SkeletonTable rows={5} cols={4} />
     </div>
